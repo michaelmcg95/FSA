@@ -5,9 +5,16 @@ from regex import *
 
 class State:
     count = 0
-    def __init__(self):
-        self.num = State.count
-        State.count += 1
+
+    @classmethod
+    def reset_count(cls):
+        cls.count = 0
+
+    def __init__(self, init=False, label=None):
+        if label is None:
+            self.label = State.count
+            State.count += 1
+        self.init = init
         self.terminal = False
         self.transitions = defaultdict(list)
 
@@ -21,14 +28,15 @@ class State:
         s = ""
         for char, states in self.transitions.items():
             if char == "":
-                char = "lambda"
-            s += f"{char}: {[s.num for s in states]}, "
+                char = "\"\""
+            s += f"{char}: {[s.label for s in states]}, "
         return s
 
 
 class FSA:
     def __init__(self, regex=None, filename=None):
         if regex is not None:
+            State.reset_count()
             self.load_from_regex(regex)
 
         elif filename is not None:
@@ -37,28 +45,35 @@ class FSA:
     def __repr__(self):
         s = ""
         for state in self.states:
-            term = ""
+            init, term = "", ""
             if state.terminal:
                 term = "t"
-            s += f"{state.num}{term} -- {repr(state)}\n"
+            if state.init:
+                init = "i"
+            s += f"{state.label}{term}{init} -- {repr(state)}\n"
         return s
     
     def load_from_regex(self, regex):
-        self.states = [State()]
+        """Create FSA from a regex"""
+        self.start_state = State(init=True)
+        self.states = [self.start_state]
         stack = []
-        last_grp_start = self.states[0]
+        last_grp_start = self.start_state
         for tok in tokenize(regex):
             if isinstance(tok, Start_Group):
                 stack.append(self.states[-1])
             elif isinstance(tok, End_Group):
+                if stack == []:
+                    raise SyntaxError
                 last_grp_start = stack.pop()
             elif isinstance(tok, (Char_Set, Char_Literal)):
                 last_grp_start = self.states[-1]
-                if hasattr(tok, "char"):
-                    tok.char_set = set(tok.char)
                 new_state = State()
-                for c in tok.char_set:
-                    self.states[-1].add_transition(c, new_state)
+                if isinstance(tok, Char_Literal):
+                    self.states[-1].add_transition(tok.char, new_state)
+                else:
+                    for c in tok.char_set:
+                        self.states[-1].add_transition(c, new_state)
                 self.states.append(new_state)
 
             else:
@@ -67,11 +82,13 @@ class FSA:
                 if isinstance(tok, (Zero_One, Zero_Plus)):
                     last_grp_start.add_transition("", self.states[-1])
 
+        if stack != []:
+            raise SyntaxError
         self.states[-1].make_terminal()
 
     def test(self, s):
         return True
     
 if __name__ == "__main__":
-    f = FSA(regex="(1(a(b[cd]*)*8)*)*")
-    print(f)
+    print(FSA(regex="(1(a(b[cd]*)*8)*)*"))
+    print(FSA(regex="[abc]12"))

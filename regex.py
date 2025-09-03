@@ -2,6 +2,9 @@
 
 import string
 
+class CharBufferEmpty(Exception):
+    pass
+
 class Token:
     pass
 
@@ -39,12 +42,16 @@ class Char_Literal(Token):
         return self.char
 
 class CharBuffer:
+    """Create buffer supporting get_next and put_back from string"""
     def __init__(self, s):
         self.buf = s
         self.put_back_chars = []
         self.i = 0
     
     def get_next(self):
+        if self.empty():
+            raise CharBufferEmpty
+        
         if self.put_back_chars != []:
             result = self.put_back_chars.pop()
         else:
@@ -61,21 +68,24 @@ class CharBuffer:
 def read_char_set(buf):
     """Read character set descriptor"""
     cpl = False
-    first = buf.get_next()
-    if first == '^':
-        cpl = True
-    else:
-        buf.put_back(first)
-    chars = []
-    at_end = False
-    while not at_end:
-        c = buf.get_next()
-        if c == ']':
-            at_end = True
-        elif c == '\\':
-            chars.append(buf.get_next())
+    try:
+        first = buf.get_next()
+        if first == '^':
+            cpl = True
         else:
-            chars.append(c)
+            buf.put_back(first)
+        chars = []
+        at_end = False
+        while not at_end:
+            c = buf.get_next()
+            if c == ']':
+                at_end = True
+            elif c == '\\':
+                chars.append(buf.get_next())
+            else:
+                chars.append(c)
+    except CharBufferEmpty:
+        raise SyntaxError
     return get_char_set(chars, cpl)
         
 def complement(char_set):
@@ -84,6 +94,7 @@ def complement(char_set):
     for c in char_set:
         result.remove(c)
     return result
+
 
 def get_char_set(char_list, cpl):
     """get set of characters specified by regex charset descriptor"""
@@ -100,17 +111,23 @@ def get_char_set(char_list, cpl):
         else:
             char_set.add(char_list[i])
             i += 1
-    if not cpl:
-        return char_set
-    return complement(char_set)
+    if cpl:
+        return complement(char_set)
+    return char_set
+
 
 def tokenize(regex):
+    """convert regex string into list of tokens"""
     tokens = []
     buf = CharBuffer(regex)
     while not buf.empty():
         c = buf.get_next()
         if c == '\\':
-            tokens.append(Char_Literal(buf.get_next()))
+            try:
+                escaped = buf.get_next()
+                tokens.append(Char_Literal(escaped))
+            except CharBufferEmpty:
+                raise SyntaxError
         elif c == '[':
             tokens.append(Char_Set(read_char_set(buf)))
         elif c == '+':
@@ -134,3 +151,8 @@ def tokenize(regex):
 
 if __name__ == "__main__":
     print(tokenize("y(ab[45]*(3[m-o]?)+)+[1-2a-cq-r]?d*"))
+    # print(tokenize("["))
+    # print(tokenize("[a"))
+    # print(tokenize("[\\"))
+    # print(tokenize("\\"))
+    # print(tokenize("123[4-6"))
