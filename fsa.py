@@ -28,7 +28,7 @@ class State:
         s = ""
         for char, states in self.transitions.items():
             if char == "":
-                char = "\"\""
+                char = '""'
             s += f"{char}: {[s.label for s in states]}, "
         return s
 

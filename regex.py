@@ -1,158 +1,179 @@
 #! /usr/bin/python3
 
-import string
-
-class CharBufferEmpty(Exception):
-    pass
-
-class Token:
-    pass
-
-class Char_Set(Token):
-    def __init__(self, char_set):
-        self.char_set = char_set
-    def __repr__(self):
-        return "".join(sorted(list(self.char_set)))
-
-class Start_Group(Token):
-    def __repr__(self):
-        return "SG"
-
-class End_Group(Token):
-    def __repr__(self):
-        return "EG"
-
-class One_Plus(Token):
-    def __repr__(self):
-        return "1+"
-
-class Zero_Plus(Token):
-    def __repr__(self):
-        return "0+"
-
-class Zero_One(Token):
-    def __repr__(self):
-        return "0-1"
-
-class Char_Literal(Token):
-    def __init__(self, char):
-        self.char = char
-
-    def __repr__(self):
-        return self.char
-
-class CharBuffer:
-    """Create buffer supporting get_next and put_back from string"""
+class Char_Buffer:
+    """Character buffer for reading characters one at a time from a string"""
     def __init__(self, s):
         self.buf = s
-        self.put_back_chars = []
         self.i = 0
     
     def get_next(self):
         if self.empty():
-            raise CharBufferEmpty
-        
-        if self.put_back_chars != []:
-            result = self.put_back_chars.pop()
-        else:
-            result =  self.buf[self.i]
-            self.i += 1
+            return None
+        result = self.buf[self.i]
+        self.i += 1
         return result
     
-    def put_back(self, c):
-        self.put_back_chars.append(c)
+    def peek(self):
+        if self.empty():
+            return None
+        return self.buf[self.i]    
+    
 
     def empty(self):
-        return self.i == len(self.buf) and len(self.put_back_chars) == 0
+        return self.i == len(self.buf)
+    
+class Operator:
+    """Regex operator with precedence"""
+    def __init__(self, symbol, priority):
+        self.priority = priority
+        self.symbol = symbol
 
-def read_char_set(buf):
-    """Read character set descriptor"""
-    cpl = False
-    try:
-        first = buf.get_next()
-        if first == '^':
-            cpl = True
-        else:
-            buf.put_back(first)
-        chars = []
-        at_end = False
-        while not at_end:
-            c = buf.get_next()
-            if c == ']':
-                at_end = True
-            elif c == '\\':
-                chars.append(buf.get_next())
+    def __lt__(self, other):
+        return self.priority < other.priority
+
+# Operator symbols
+UNION_SYM = "+"
+CAT_SYM = "."
+STAR_SYM = "*"
+OPERATOR_SYM = UNION_SYM, CAT_SYM, STAR_SYM
+
+# Regex operators 
+UNION = Operator(UNION_SYM, 1)
+CAT = Operator(CAT_SYM, 2)
+STAR = Operator(STAR_SYM, 3)
+
+class Regex_Node:
+    def __init__(self, op):
+        self.op = op
+        self.children = []
+
+    def add_child(self, child):
+        self.children.append(child)
+
+    def __repr__(self):
+        result =  f"({self.op.symbol}"
+        for child in self.children:
+            if isinstance(child, str):
+                result += f" {child}"
             else:
-                chars.append(c)
-    except CharBufferEmpty:
-        raise SyntaxError
-    return get_char_set(chars, cpl)
+                result += f" {repr(child)}"
+        result += ")"
+        return result
+
+class Stack():
+    """Stack for holding operations and operands in regex string"""
+
+    def __init__(self):
+        self.stack = []
+
+    def push(self, val):
+        self.stack.append(val)
+
+    def pop(self):
+        return self.stack.pop()
+    
+    def top(self):
+        return self.stack[-1]
+    
+    def size(self):
+        return len(self.stack)
+    
+    def empty(self):
+        return len(self.stack) == 0
+    
+    def reduce(self):
+        """Apply the last operation in the stack and push back the result"""
+        right = self.pop()
+        op = self.pop()
+        left = self.pop()
+        node = Regex_Node(op)
+        node.add_child(left)
+        node.add_child(right)
+        self.push(node)
+
+    def reduce_all(self):
+        """Reduce until stack contains a single value"""
+        # check for operator missing operand
+        if not self.empty() and isinstance(self.top(), Operator):
+            raise SyntaxError("missing operand")
         
-def complement(char_set):
-    """Get complement of set of characters"""
-    result = set(string.printable)
-    for c in char_set:
-        result.remove(c)
-    return result
+        while self.size() > 1:
+            self.reduce()
 
+    def push_implied_cat(self):
+        """Insert concatenation operator if top of stack is not an operator"""
+        if not self.empty() and not isinstance(self.top(), Operator):
+            self.push(CAT)
 
-def get_char_set(char_list, cpl):
-    """get set of characters specified by regex charset descriptor"""
-    char_set = set()
-    length = len(char_list)
-    i = 0
-    while i < length:
-        if i < length - 2 and char_list[i + 1] == '-':
-            first = ord(char_list[i])
-            last = ord(char_list[i + 2])
-            for char_code in range(first, last + 1):
-                char_set.add(chr(char_code))
-            i += 3
+class Regex_Parser:
+    """Class for creating parse trees from regex expressions"""
+    def __init__(self, regex):
+        self.buf = Char_Buffer(regex)
+
+    def _operator(self, c, stack):
+        """handle operator character"""
+        if stack.empty() or isinstance(stack.top(), Operator):
+            raise SyntaxError("missing operand")
+        if c == UNION_SYM:
+            stack.push(UNION)
+        elif c == CAT_SYM:
+            stack.push(CAT)
         else:
-            char_set.add(char_list[i])
-            i += 1
-    if cpl:
-        return complement(char_set)
-    return char_set
+            stack_top = stack.pop()
+            node = Regex_Node(STAR)
+            node.add_child(stack_top)
+            stack.push(node)
 
+    def _normal_char(self, c, stack):
+        """handle character without special meaning"""
+        stack.push_implied_cat()
+        prev_op = None
+        if not stack.empty():
+            prev_op = stack.top()
+        stack.push(c)
 
-def tokenize(regex):
-    """convert regex string into list of tokens"""
-    tokens = []
-    buf = CharBuffer(regex)
-    while not buf.empty():
-        c = buf.get_next()
-        if c == '\\':
-            try:
-                escaped = buf.get_next()
-                tokens.append(Char_Literal(escaped))
-            except CharBufferEmpty:
-                raise SyntaxError
-        elif c == '[':
-            tokens.append(Char_Set(read_char_set(buf)))
-        elif c == '+':
-            tokens.append(One_Plus())
-        elif c == '*':
-            tokens.append(Zero_Plus())        
-        elif c == '?':
-            tokens.append(Zero_One())
-        elif c == '(':
-            tokens.append(Start_Group())
-        elif c == ')':
-            tokens.append(End_Group())
-        else:
-            tokens.append(Char_Literal(c))
-    return tokens
+        # apply prev operation if higher priority than next operation
+        if prev_op is not None and not self.buf.empty():
+            next_char = self.buf.peek()
+            next_op = None
+            if next_char == STAR_SYM:
+                next_op = STAR
+            elif next_char == UNION_SYM:
+                next_op = UNION
+            elif next_char != ")":
+                next_op = CAT
+            if next_op is not None and prev_op > next_op:
+                stack.reduce()
+    
+    def parse(self, recursive=False):
+        """Create a parse tree from a regex string"""
+        stack = Stack()
+        while not self.buf.empty():
+            c = self.buf.get_next()
+            if c == "(":
+                stack.push_implied_cat()
+                stack.push(self.parse(recursive=True))
+            elif c == ")":
+                if recursive:
+                    stack.reduce_all()
+                    return stack.pop()
+                raise SyntaxError("unmatched parenthesis")
 
-# print(sorted(list(read_char_set(CharBuffer("^abcdef\]g\\\\hij]")))))
-# print(list(read_char_set(CharBuffer("\^abcdef\]g\\\\hij]"))))
-# s = input("enter charset descriptor: ")
-# print(read_char_set(CharBuffer(s)))
+            # operator character
+            elif c in OPERATOR_SYM:
+                self._operator(c, stack)
 
-if __name__ == "__main__":
-    print(tokenize("y(ab[45]*(3[m-o]?)+)+[1-2a-cq-r]?d*"))
-    # print(tokenize("["))
-    # print(tokenize("[a"))
-    # print(tokenize("[\\"))
-    # print(tokenize("\\"))
-    # print(tokenize("123[4-6"))
+            # character without special meaning
+            else:
+                self._normal_char(c, stack)
+
+        if not recursive:
+            stack.reduce_all()
+            return stack.pop()
+        raise SyntaxError("missing closing parenthesis")
+
+def parse(regex):
+    return Regex_Parser(regex).parse()
+
+print(parse("(a+b+c)"))
+
