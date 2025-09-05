@@ -1,5 +1,9 @@
 #! /usr/bin/python3
 
+# special regex characters
+EMPTY_REGEX = "~"
+LAMBDA_REGEX = "^"
+
 class Char_Buffer:
     """Character buffer for reading characters one at a time from a string"""
     def __init__(self, s):
@@ -42,23 +46,34 @@ UNION = Operator(UNION_SYM, 1)
 CAT = Operator(CAT_SYM, 2)
 STAR = Operator(STAR_SYM, 3)
 
-class Regex_Node:
-    def __init__(self, op):
-        self.op = op
-        self.children = []
-
-    def add_child(self, child):
-        self.children.append(child)
+class Character_Node:
+    def __init__(self, char):
+        self.char = char
 
     def __repr__(self):
-        result =  f"({self.op.symbol}"
-        for child in self.children:
-            if isinstance(child, str):
-                result += f" {child}"
-            else:
-                result += f" {repr(child)}"
-        result += ")"
-        return result
+        return self.char
+
+class Star_Node:
+    def __init__(self, child):
+        self.child = child
+
+    def __repr__(self):
+        return f"({STAR_SYM} {repr(self.child)})"
+    
+class Bin_Op_Node:
+    def __init__(self, left, right):
+        self.left = left
+        self.right = right
+
+    def __repr__(self):
+        return f"({self.op.symbol} {repr(self.left)} {repr(self.right)})"
+    
+class Cat_Node(Bin_Op_Node):
+    op = CAT
+
+class Union_Node(Bin_Op_Node):
+    op = UNION
+
 
 class Stack():
     """Stack for holding operations and operands in regex string"""
@@ -86,9 +101,10 @@ class Stack():
         right = self.pop()
         op = self.pop()
         left = self.pop()
-        node = Regex_Node(op)
-        node.add_child(left)
-        node.add_child(right)
+        if op == CAT:
+            node = Cat_Node(left, right)
+        elif op == UNION:
+            node = Union_Node(left, right)
         self.push(node)
 
     def reduce_all(self):
@@ -110,6 +126,18 @@ class Regex_Parser:
     def __init__(self, regex):
         self.buf = Char_Buffer(regex)
 
+    @staticmethod
+    def simplify_star(node):
+        """remove redunant stars nodes from child of star node"""
+        if isinstance(node, Star_Node):
+            return node.child
+        
+        if isinstance(node, Union_Node):
+            node.left = Regex_Parser.simplify_star(node.left)
+            node.right = Regex_Parser.simplify_star(node.right)
+
+        return node
+
     def _operator(self, c, stack):
         """handle operator character"""
         if stack.empty() or isinstance(stack.top(), Operator):
@@ -119,10 +147,15 @@ class Regex_Parser:
         elif c == CAT_SYM:
             stack.push(CAT)
         else:
-            stack_top = stack.pop()
-            node = Regex_Node(STAR)
-            node.add_child(stack_top)
-            stack.push(node)
+            # star operator
+            stack_top = stack.top()
+            # check if top is already a STAR node to avoid redundancy
+            if not isinstance(stack_top, Star_Node):
+                stack.pop()
+                # star nodes inside a union inside a star are reduntant
+                if isinstance(stack_top, Union_Node):
+                    stack_top = Regex_Parser.simplify_star(stack_top)
+                stack.push(Star_Node(stack_top))
 
     def _normal_char(self, c, stack):
         """handle character without special meaning"""
@@ -130,7 +163,7 @@ class Regex_Parser:
         prev_op = None
         if not stack.empty():
             prev_op = stack.top()
-        stack.push(c)
+        stack.push(Character_Node(c))
 
         # apply prev operation if higher priority than next operation
         if prev_op is not None and not self.buf.empty():
@@ -155,6 +188,8 @@ class Regex_Parser:
                 stack.push(self.parse(recursive=True))
             elif c == ")":
                 if recursive:
+                    if stack.empty():
+                        raise SyntaxError("empty parenthetical expression")
                     stack.reduce_all()
                     return stack.pop()
                 raise SyntaxError("unmatched parenthesis")
@@ -168,6 +203,8 @@ class Regex_Parser:
                 self._normal_char(c, stack)
 
         if not recursive:
+            if stack.empty():
+                raise SyntaxError("empty string")
             stack.reduce_all()
             return stack.pop()
         raise SyntaxError("missing closing parenthesis")
@@ -175,5 +212,7 @@ class Regex_Parser:
 def parse(regex):
     return Regex_Parser(regex).parse()
 
-print(parse("(a+b+c)"))
+if __name__ == "__main__":
+    print(parse("abc"))
+    print(parse("(a*+b*+c*+d*+e*)*"))
 

@@ -4,25 +4,49 @@ from collections import defaultdict
 from regex import *
 
 class State:
-    count = 0
-
-    @classmethod
-    def reset_count(cls):
-        cls.count = 0
-
-    def __init__(self, init=False, label=None):
-        if label is None:
-            self.label = State.count
-            State.count += 1
+    def __init__(self, init=False, final=False, label=None):
+        self.label = label
         self.init = init
-        self.terminal = False
-        self.transitions = defaultdict(list)
+        self.final = final
+        self.transitions = defaultdict(set)
+        self.incoming = defaultdict(set)
 
-    def make_terminal(self):
-        self.terminal = True
+    # def replace(self, src):
+    #     """replace transitions with those of source state"""
+    #     self.init = src.init
+    #     self.final = src.final
+    #     self.transitions = src.transitions
+    #     for char, states in src.transitions.items():
+    #         for state in states:
+    #             state.incoming[char].remove(src)
+    #             state.incoming[char].add(self)
+
+    def merge(self, src, overwrite=False):
+        """add transitions from source state"""
+        if overwrite:
+            self.init = src.init
+            self.final = src.final
+            self.transitions = src.transitions
+
+        for char, states in src.transitions.items():
+            if not overwrite:
+                combined = self.transitions[char].union(states)
+                self.transitions[char] = combined
+            for state in states:
+                state.incoming[char].remove(src)
+                state.incoming[char].add(self)
+
+        for char, states in src.incoming.items():
+            combined = self.incoming[char].union(states)
+            self.incoming[char] = combined
+            for state in states:
+                state.transitions[char].remove(src)
+                state.transitions[char].add(self)
+
 
     def add_transition(self, char, state):
-        self.transitions[char].append(state)
+        self.transitions[char].add(state)
+        state.incoming[char].add(self)
 
     def __repr__(self):
         s = ""
@@ -30,14 +54,23 @@ class State:
             if char == "":
                 char = '""'
             s += f"{char}: {[s.label for s in states]}, "
+        s += "In: "
+        for char, states in self.incoming.items():
+                if char == "":
+                    char = '""'
+                s += f"{char}: {[s.label for s in states]}, "
+
         return s
 
 
 class FSA:
-    def __init__(self, regex=None, filename=None):
+    def __init__(self, regex=None, node=None, filename=None):
         if regex is not None:
-            State.reset_count()
-            self.load_from_regex(regex)
+            self.eval_node(parse(regex))
+            self.label_states()
+        
+        elif node is not None:
+            self.eval_node(node)
 
         elif filename is not None:
             pass
@@ -45,50 +78,44 @@ class FSA:
     def __repr__(self):
         s = ""
         for state in self.states:
-            init, term = "", ""
-            if state.terminal:
-                term = "t"
+            init, final = "", ""
+            if state.final:
+                final = "f"
             if state.init:
                 init = "i"
-            s += f"{state.label}{term}{init} -- {repr(state)}\n"
+            s += f"{state.label}{init}{final} -- {repr(state)}\n"
         return s
     
-    def load_from_regex(self, regex):
-        """Create FSA from a regex"""
-        self.start_state = State(init=True)
-        self.states = [self.start_state]
-        stack = []
-        last_grp_start = self.start_state
-        for tok in tokenize(regex):
-            if isinstance(tok, Start_Group):
-                stack.append(self.states[-1])
-            elif isinstance(tok, End_Group):
-                if stack == []:
-                    raise SyntaxError
-                last_grp_start = stack.pop()
-            elif isinstance(tok, (Char_Set, Char_Literal)):
-                last_grp_start = self.states[-1]
-                new_state = State()
-                if isinstance(tok, Char_Literal):
-                    self.states[-1].add_transition(tok.char, new_state)
-                else:
-                    for c in tok.char_set:
-                        self.states[-1].add_transition(c, new_state)
-                self.states.append(new_state)
-
-            else:
-                if isinstance(tok, (Zero_Plus, One_Plus)):
-                    self.states[-1].add_transition("", last_grp_start)
-                if isinstance(tok, (Zero_One, Zero_Plus)):
-                    last_grp_start.add_transition("", self.states[-1])
-
-        if stack != []:
-            raise SyntaxError
-        self.states[-1].make_terminal()
-
+    def label_states(self):
+        for count, state in enumerate(self.states):
+            state.label = count
+        
+    def eval_node(self, node):
+        """Create FSA from a regex parse tree"""
+        if isinstance(node, Character_Node):
+            init = State(init=True)
+            final = State(final=True)
+            self.states = [init, final]
+            self.init_state = init
+            self.final_state = final
+            init.add_transition(node.char, final)
+        elif isinstance(node, Cat_Node):
+            left = FSA(node=node.left)
+            right = FSA(node=node.right)
+            self.init_state = left.init_state
+            left.final_state.merge(right.init_state, overwrite=True)
+            left.final_state.init = False
+            self.final_state = right.final_state
+            self.states = left.states + right.states[1:]
+        if isinstance(node, Union_Node):
+            left = FSA(node=node.left)
+            right = FSA(node=node.right)
+            left.init_state.merge(right.init_state)
+            right.final_state.merge(left.final_state)
+            self.states = left.states[:-1] + right.states[1:]
+            
     def test(self, s):
         return True
     
 if __name__ == "__main__":
-    print(FSA(regex="(1(a(b[cd]*)*8)*)*"))
-    print(FSA(regex="[abc]12"))
+    print(FSA(regex="ab+cd"))
