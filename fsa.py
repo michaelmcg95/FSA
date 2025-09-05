@@ -64,8 +64,39 @@ class FSA:
             self.eval_node(node)
 
         elif filename is not None:
-            pass
+            self.load_file(filename)
     
+    def load_file(self, filename):
+        with open(filename, "r") as file:
+            lines = file.readlines()
+        lines = [l for l in lines if l[0] not in ('#', '\n')]
+        states = {}
+        transitions = defaultdict(list)
+        label = None
+        current_state = None
+        for line in lines:
+            c = line[0]
+            words = line.split()
+            if c == '@':
+                label = words[0][1:]
+                current_state = State(label=label)
+                states[label] = current_state
+            elif c == '!':
+                self.init_state = current_state
+            elif c == '$':
+                current_state.final = True
+            else:
+                if c == "^":
+                    c = ""
+                for word in words[1:]:
+                    transitions[current_state.label].append((c, word))
+        
+        for src_label, trans in transitions.items():
+            for c, dest_label in trans:
+                state = states[src_label]
+                dest_state = states[dest_label]
+                state.add_transition(c, dest_state)
+
     def label_states(self):
         def enum_label(states):
             for count, state in enumerate(states):
@@ -74,7 +105,7 @@ class FSA:
 
     def __repr__(self):
         def make_repr(state):
-            final = "f" if state.final else ""
+            final = "*" if state.final else ""
             return f"{state.label}{final} -- {repr(state)}"
         
         s = f"Start: {self.init_state.label}\n"
@@ -162,8 +193,36 @@ class FSA:
             self.eval_star(node)
           
     def test(self, s):
-        return True
+        def _test(s, index, state):
+            # Reached end of string. Test if state is final
+            if index == len(s):
+                if state.final:
+                    return True
+                else:
+                    return False
+                
+            c = s[index]
+            # Try all transitions from current character
+            if c in state.transitions:
+                for next_state in state.transitions[c]:
+                    if _test(s, index + 1, next_state):
+                        return True
+            # Try all lambda transitions
+            if "" in state.transitions:
+                for next_state in state.transitions[""]:
+                    if _test(s, index, next_state):
+                        return True
+            return False
+
+        return _test(s, 0, self.init_state)
     
 if __name__ == "__main__":
-    print(FSA(regex="a(b+c)*"))
-    print()
+    # a = FSA(regex="(ab)*ac")
+    # print(a)
+    # print("a", a.test("a"))
+    # print("b", a.test("b"))
+    # print("(empty)", a.test(""))
+    a = FSA(filename="a")
+    print(a)
+    print("a", a.test("abac"))
+

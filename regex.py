@@ -22,7 +22,6 @@ class Char_Buffer:
             return None
         return self.buf[self.i]    
     
-
     def empty(self):
         return self.i == len(self.buf)
     
