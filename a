@@ -16,7 +16,7 @@
 
 
 @mylabel
-^: start
+$
 
 @deadend
 

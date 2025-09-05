@@ -201,6 +201,13 @@ class FSA:
             if visit_ind.get(state, -1) == index:
                 return False
             visit_ind[state] = index
+
+            # Try all lambda transitions
+            if "" in state.transitions:
+                for next_state in state.transitions[""]:
+                    if _test(s, index, next_state):
+                        return True  
+
             # Reached end of string. Test if state is final
             if index == len(s):
                 if state.final:
@@ -213,25 +220,19 @@ class FSA:
             if c in state.transitions:
                 for next_state in state.transitions[c]:
                     if _test(s, index + 1, next_state):
-                        return True
-                    
-            
-            # Try all lambda transitions
-            if "" in state.transitions:
-                for next_state in state.transitions[""]:
-                    if _test(s, index, next_state):
-                        return True
+                        return True  
+
             return False
 
         return _test(s, 0, self.init_state)
     
 if __name__ == "__main__":
-    a = FSA(regex="(ab)*a+c")
-    print(a)
+    # a = FSA(regex="(ab)*a+c")
+    # print(a)
     # print("a", a.test("a"))
     # print("b", a.test("b"))
     # print("(empty)", a.test(""))
     a = FSA(filename="a")
     print(a)
-    print("a", a.test("abac"))
+    print("(empty)", a.test(""))
 
