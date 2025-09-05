@@ -4,45 +4,36 @@ from collections import defaultdict
 from regex import *
 
 class State:
-    def __init__(self, init=False, final=False, label=None):
+    def __init__(self, final=False, label=None):
         self.label = label
-        self.init = init
         self.final = final
         self.transitions = defaultdict(set)
         self.incoming = defaultdict(set)
 
-    # def replace(self, src):
-    #     """replace transitions with those of source state"""
-    #     self.init = src.init
-    #     self.final = src.final
-    #     self.transitions = src.transitions
-    #     for char, states in src.transitions.items():
-    #         for state in states:
-    #             state.incoming[char].remove(src)
-    #             state.incoming[char].add(self)
-
-    def merge(self, src, overwrite=False):
-        """add transitions from source state"""
-        if overwrite:
-            self.init = src.init
-            self.final = src.final
-            self.transitions = src.transitions
-
+    def merge(self, src):
+        """add transitions to/from source state into self"""
+        self.final = src.final
         for char, states in src.transitions.items():
-            if not overwrite:
-                combined = self.transitions[char].union(states)
-                self.transitions[char] = combined
             for state in states:
+                self.transitions[char].add(state)
                 state.incoming[char].remove(src)
                 state.incoming[char].add(self)
 
         for char, states in src.incoming.items():
-            combined = self.incoming[char].union(states)
-            self.incoming[char] = combined
             for state in states:
+                self.incoming[char].add(state)
                 state.transitions[char].remove(src)
                 state.transitions[char].add(self)
 
+    def has_outgoing(self):
+        return len(self.transitions) != 0
+    
+    def has_incoming(self):
+        return len(self.incoming) != 0
+
+    def redir_trans(self, char, old_state, new_state):
+        self.transitions[char].remove(old_state)
+        self.add_transition(char, new_state)
 
     def add_transition(self, char, state):
         self.transitions[char].add(state)
@@ -74,48 +65,105 @@ class FSA:
 
         elif filename is not None:
             pass
-
-    def __repr__(self):
-        s = ""
-        for state in self.states:
-            init, final = "", ""
-            if state.final:
-                final = "f"
-            if state.init:
-                init = "i"
-            s += f"{state.label}{init}{final} -- {repr(state)}\n"
-        return s
     
     def label_states(self):
-        for count, state in enumerate(self.states):
-            state.label = count
+        def enum_label(states):
+            for count, state in enumerate(states):
+                state.label = count
+        self.traverse_states(aggregator=enum_label)
+
+    def __repr__(self):
+        def make_repr(state):
+            final = "f" if state.final else ""
+            return f"{state.label}{final} -- {repr(state)}"
         
+        s = f"Start: {self.init_state.label}\n"
+        return s + self.traverse_states(func=make_repr, aggregator="\n".join)
+
+    def traverse_states(self, func=lambda x: x, aggregator=lambda x: x ):
+        """DFS traversal of states. Make list of values by applying func to 
+        each state. Return result of applying aggregator to this list."""
+        result = []
+        to_visit = [self.init_state]
+        visited = set()
+
+        while len(to_visit) > 0:
+            state = to_visit.pop()
+            if state not in visited:
+                visited.add(state)
+                for state_set in state.transitions.values():
+                    for st in state_set:
+                        to_visit.append(st)
+                result.append(func(state))
+        return aggregator(result)
+        
+    def eval_union(self, left, right):
+        """Create FSA from regex union node"""
+        for childFSA in left, right:
+            # add new initial state if child's init has incoming transition
+            if childFSA.init_state.has_incoming():
+                new_init = State()
+                new_init.add_transition("", childFSA.init_state)
+                childFSA.init_state = new_init
+            # add new final state if child's final has outgoing transition
+            if childFSA.final_state.has_outgoing():
+                new_final = State(final=True)
+                childFSA.final_state.add_transition("", new_final)
+                childFSA.final_state.final = False
+                childFSA.final_state = new_final
+        left.init_state.merge(right.init_state)
+        right.final_state.merge(left.final_state)
+        self.init_state = left.init_state
+        self.final_state = right.final_state
+
+    def eval_cat(self, left, right):
+        """Create FSA from regex cat node"""
+        left.final_state.final = False
+        if (right.init_state.has_incoming() and 
+            left.final_state.has_outgoing()):
+            left.final_state.add_transition("", right.init_state)
+        else:
+            left.final_state.merge(right.init_state)
+        self.init_state = left.init_state
+        self.final_state = right.final_state
+
+    def eval_star(self, node):
+        """Create FSA from regex star node"""
+        child = FSA(node=node.child)
+        for char, state_set in child.final_state.incoming.items():
+            for state in state_set:
+                state.redir_trans(char, child.final_state, child.init_state)
+        self.init_state = child.init_state
+        self.final_state = child.init_state
+        self.init_state.final = True
+
+    def eval_char_node(self, node):
+        """Create FSA from regex character node"""
+        init = State()
+        final = State(final=True)
+        self.init_state = init
+        self.final_state = final
+        init.add_transition(node.char, final)
+
     def eval_node(self, node):
         """Create FSA from a regex parse tree"""
         if isinstance(node, Character_Node):
-            init = State(init=True)
-            final = State(final=True)
-            self.states = [init, final]
-            self.init_state = init
-            self.final_state = final
-            init.add_transition(node.char, final)
-        elif isinstance(node, Cat_Node):
+            self.eval_char_node(node)
+
+        elif isinstance(node, Bin_Op_Node):
             left = FSA(node=node.left)
             right = FSA(node=node.right)
-            self.init_state = left.init_state
-            left.final_state.merge(right.init_state, overwrite=True)
-            left.final_state.init = False
-            self.final_state = right.final_state
-            self.states = left.states + right.states[1:]
-        if isinstance(node, Union_Node):
-            left = FSA(node=node.left)
-            right = FSA(node=node.right)
-            left.init_state.merge(right.init_state)
-            right.final_state.merge(left.final_state)
-            self.states = left.states[:-1] + right.states[1:]
-            
+            if isinstance(node, Cat_Node):
+                self.eval_cat(left, right)
+            elif isinstance(node, Union_Node):
+                self.eval_union(left, right)
+
+        elif isinstance(node, Star_Node):
+            self.eval_star(node)
+          
     def test(self, s):
         return True
     
 if __name__ == "__main__":
-    print(FSA(regex="ab+cd"))
+    print(FSA(regex="a(b+c)*"))
+    print()

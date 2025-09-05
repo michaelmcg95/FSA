@@ -213,6 +213,6 @@ def parse(regex):
     return Regex_Parser(regex).parse()
 
 if __name__ == "__main__":
-    print(parse("abc"))
+    print(parse("abc*"))
     print(parse("(a*+b*+c*+d*+e*)*"))
 
