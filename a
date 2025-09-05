@@ -12,13 +12,11 @@
 
 @start
 !
-a: mylabel
+^: mylabel
 
 
 @mylabel
-b: start
-c: final
-^: deadend
+^: start
 
 @deadend
 

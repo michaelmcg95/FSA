@@ -128,8 +128,10 @@ class FSA:
                 result.append(func(state))
         return aggregator(result)
         
-    def eval_union(self, left, right):
+    def eval_union_node(self, node):
         """Create FSA from regex union node"""
+        left = FSA(node=node.left)
+        right = FSA(node=node.right)
         for childFSA in left, right:
             # add new initial state if child's init has incoming transition
             if childFSA.init_state.has_incoming():
@@ -147,8 +149,10 @@ class FSA:
         self.init_state = left.init_state
         self.final_state = right.final_state
 
-    def eval_cat(self, left, right):
+    def eval_cat_node(self, node):
         """Create FSA from regex cat node"""
+        left = FSA(node=node.left)
+        right = FSA(node=node.right)
         left.final_state.final = False
         if (right.init_state.has_incoming() and 
             left.final_state.has_outgoing()):
@@ -158,7 +162,7 @@ class FSA:
         self.init_state = left.init_state
         self.final_state = right.final_state
 
-    def eval_star(self, node):
+    def eval_star_node(self, node):
         """Create FSA from regex star node"""
         child = FSA(node=node.child)
         for char, state_set in child.final_state.incoming.items():
@@ -181,19 +185,22 @@ class FSA:
         if isinstance(node, Character_Node):
             self.eval_char_node(node)
 
-        elif isinstance(node, Bin_Op_Node):
-            left = FSA(node=node.left)
-            right = FSA(node=node.right)
-            if isinstance(node, Cat_Node):
-                self.eval_cat(left, right)
-            elif isinstance(node, Union_Node):
-                self.eval_union(left, right)
+        if isinstance(node, Cat_Node):
+            self.eval_cat_node(node)
+
+        if isinstance(node, Union_Node):
+            self.eval_union_node(node)
 
         elif isinstance(node, Star_Node):
-            self.eval_star(node)
+            self.eval_star_node(node)
           
     def test(self, s):
+        visit_ind = {}
         def _test(s, index, state):
+            # check if state visited at same index to avoid infinite recursion
+            if visit_ind.get(state, -1) == index:
+                return False
+            visit_ind[state] = index
             # Reached end of string. Test if state is final
             if index == len(s):
                 if state.final:
@@ -207,6 +214,8 @@ class FSA:
                 for next_state in state.transitions[c]:
                     if _test(s, index + 1, next_state):
                         return True
+                    
+            
             # Try all lambda transitions
             if "" in state.transitions:
                 for next_state in state.transitions[""]:
@@ -217,8 +226,8 @@ class FSA:
         return _test(s, 0, self.init_state)
     
 if __name__ == "__main__":
-    # a = FSA(regex="(ab)*ac")
-    # print(a)
+    a = FSA(regex="(ab)*a+c")
+    print(a)
     # print("a", a.test("a"))
     # print("b", a.test("b"))
     # print("(empty)", a.test(""))
