@@ -30,10 +30,7 @@ class Operator:
     def __init__(self, symbol, priority):
         self.priority = priority
         self.symbol = symbol
-
-    def __lt__(self, other):
-        return self.priority < other.priority
-
+    
 # Operator symbols
 UNION_SYM = "+"
 CAT_SYM = "."
@@ -147,14 +144,8 @@ class Regex_Parser:
             stack.push(CAT)
         else:
             # star operator
-            stack_top = stack.top()
-            # check if top is already a STAR node to avoid redundancy
-            if not isinstance(stack_top, Star_Node):
-                stack.pop()
-                # star nodes inside a union inside a star are reduntant
-                if isinstance(stack_top, Union_Node):
-                    stack_top = Regex_Parser.simplify_star(stack_top)
-                stack.push(Star_Node(stack_top))
+            stack_top = Regex_Parser.simplify_star(stack.pop())
+            stack.push(Star_Node(stack_top))
 
     def _normal_char(self, c, stack):
         """handle character without special meaning"""
@@ -174,7 +165,7 @@ class Regex_Parser:
                 next_op = UNION
             elif next_char != ")":
                 next_op = CAT
-            if next_op is not None and prev_op > next_op:
+            if next_op is not None and prev_op.priority >= next_op.priority:
                 stack.reduce()
     
     def parse(self, recursive=False):
@@ -212,6 +203,6 @@ def parse(regex):
     return Regex_Parser(regex).parse()
 
 if __name__ == "__main__":
-    print(parse("abc*"))
+    print(parse("abc**"))
     print(parse("(a*+b*+c*+d*+e*)*"))
 

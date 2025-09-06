@@ -16,9 +16,10 @@
 
 
 @mylabel
-$
+^: deadend
 
 @deadend
+^: start
 
 @final
 $

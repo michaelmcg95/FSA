@@ -57,6 +57,7 @@ class State:
 class FSA:
     def __init__(self, regex=None, node=None, filename=None):
         if regex is not None:
+            tree = parse(regex)
             self.eval_node(parse(regex))
             self.label_states()
         
@@ -145,9 +146,9 @@ class FSA:
                 childFSA.final_state.final = False
                 childFSA.final_state = new_final
         left.init_state.merge(right.init_state)
-        right.final_state.merge(left.final_state)
+        left.final_state.merge(right.final_state)
         self.init_state = left.init_state
-        self.final_state = right.final_state
+        self.final_state = left.final_state
 
     def eval_cat_node(self, node):
         """Create FSA from regex cat node"""
@@ -194,45 +195,66 @@ class FSA:
         elif isinstance(node, Star_Node):
             self.eval_star_node(node)
           
-    def test(self, s):
+    def test(self, s, trace=False):
+        def print_trace(trans, label, str):
+            print(f"{trans:15}{label:<13} {str}")
+
+        if trace:
+            print("Transition     State         Remaining String")
+            print("-" * 50)
+            print_trace("(none)", self.init_state.label, s)
         visit_ind = {}
+
         def _test(s, index, state):
             # check if state visited at same index to avoid infinite recursion
             if visit_ind.get(state, -1) == index:
+                if trace:
+                    print("Backtracking to avoid infinite loop.")
                 return False
             visit_ind[state] = index
 
+            # Success: reached end of string in final state
+            if index == len(s) and state.final:
+                return True
+            
             # Try all lambda transitions
             if "" in state.transitions:
                 for next_state in state.transitions[""]:
+                    if trace:
+                        print_trace('""', next_state.label, s[index:])
                     if _test(s, index, next_state):
-                        return True  
-
-            # Reached end of string. Test if state is final
+                        return True 
+                     
+            # Failed: At end of string but not in final state
             if index == len(s):
-                if state.final:
-                    return True
-                else:
-                    return False
+                return False
                 
             c = s[index]
             # Try all transitions from current character
             if c in state.transitions:
                 for next_state in state.transitions[c]:
+                    if trace:
+                        print_trace(c, next_state.label, s[index + 1:])
                     if _test(s, index + 1, next_state):
-                        return True  
-
+                        return True
+            if trace:
+                print("No path from this state. Backtracking to previous.")
             return False
 
-        return _test(s, 0, self.init_state)
+        accepted = _test(s, 0, self.init_state)
+        if trace:
+            if accepted:
+                print(f"{s} accepted")
+            else:
+                print(f"{s} rejected")
+        return accepted
     
 if __name__ == "__main__":
-    # a = FSA(regex="(ab)*a+c")
+    a = FSA(regex="abc+abd")
+    print(a, "\n")
+    print(a.test("abd", trace=True))
+
+    # a = FSA(filename="a")
     # print(a)
-    # print("a", a.test("a"))
-    # print("b", a.test("b"))
-    # print("(empty)", a.test(""))
-    a = FSA(filename="a")
-    print(a)
-    print("(empty)", a.test(""))
+    # print(a.test("", trace=True))
 
