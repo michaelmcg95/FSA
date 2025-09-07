@@ -11,18 +11,18 @@ class State:
         self.incoming = defaultdict(set)
 
     def merge(self, src):
-        """take over all transitions to/from source"""
+        """take all transitions to/from source"""
 
-        def redirect(char, state):
+        def change_outgoing(char, state):
             self.add_transition(char, state)
             state.incoming[char].remove(src)
 
-        def change_origin(char, state):
+        def change_incoming(char, state):
             state.transitions[char].remove(src)
             state.add_transition(char, self)
 
-        src.iterate_over_incoming(change_origin)
-        src.iterate_over_transitions(redirect)
+        src.iterate_over_incoming(change_incoming)
+        src.iterate_over_transitions(change_outgoing)
         self.final = src.final
 
     def add_transition(self, char, state):
@@ -108,23 +108,20 @@ class FSA:
                 state.add_transition(c, dest_state)
 
     def label_states(self):
-        def enum_label(states):
-            for count, state in enumerate(states):
-                state.label = count
-        self.traverse_states(aggregator=enum_label)
+        for count, state in enumerate(self.get_state_list()):
+            state.label = count
 
     def __repr__(self):
-        def make_repr(state):
-            final = "*" if state.final else ""
-            return f"{state.label}{final:1} -- {repr(state)}"
-        
         s = f"Start: {self.init_state.label}\n"
-        return s + self.traverse_states(func=make_repr, aggregator="\n".join)
+        for state in self.get_state_list():
+            final = "*" if state.final else ""
+            s += f"{state.label}{final:1} -- {repr(state)}\n"
+        
+        return s 
 
-    def traverse_states(self, func=lambda x: x, aggregator=lambda x: x ):
-        """DFS traversal of states. Make list of values by applying func to 
-        each state. Return result of applying aggregator to this list."""
-        result = []
+    def get_state_list(self):
+        """Get list of reachable states in DFS traversal order."""
+        state_list = []
         to_visit = [self.init_state]
         visited = set()
 
@@ -135,8 +132,8 @@ class FSA:
                 for state_set in state.transitions.values():
                     for st in state_set:
                         to_visit.append(st)
-                result.append(func(state))
-        return aggregator(result)
+                state_list.append(state)
+        return state_list
         
     def eval_union_node(self, node):
         """Create FSA from regex union node"""
@@ -178,13 +175,15 @@ class FSA:
     def eval_star_node(self, node):
         """Create FSA from regex star node"""
         child = FSA(node=node.child)
-        new_init = State(final=True)
-        new_init.add_transition("", child.init_state)
-        child.final_state.add_transition("", new_init)
-        child.final_state.final = False
-        self.init_state = new_init
-        self.final_state = new_init
-        self.final_state.final = True
+        self.init_state = child.init_state
+        if (not child.final_state.has_outgoing() and 
+            not child.init_state.has_incoming()):
+            child.init_state.merge(child.final_state)
+            self.final_state = child.init_state
+            self.final_state.final == True
+        else:
+            child.final_state.add_transition("", child.init_state)
+            self.final_state = child.final_state
 
     def eval_leaf_node(self, char=None):
         """Create FSA from character, lambda, or null node"""
@@ -270,13 +269,13 @@ class FSA:
         return accepted
 
 if __name__ == "__main__":
-    a = FSA(regex="a+^")
-    print(a, "\n")
+    a = FSA(regex="(a*bcd*)*")
+    print(a)
     # a = FSA(regex="cd*")
     # print(a, "\n")
     # print(a.test("abc"))
 
     # a = FSA(filename="a")
     # print(a)
-    # print(a.test("", trace=True))
+    print(a.test("aabcabcdd"))
 
