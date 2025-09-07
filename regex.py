@@ -1,8 +1,8 @@
 #! /usr/bin/python3
 
 # special regex characters
-EMPTY_REGEX = "~"
-LAMBDA_REGEX = "^"
+NULL_CHAR = "~"
+LAMBDA_CHAR = "^"
 
 class Char_Buffer:
     """Character buffer for reading characters one at a time from a string"""
@@ -31,6 +31,9 @@ class Operator:
         self.priority = priority
         self.symbol = symbol
     
+    def __repr__(self):
+        return self.symbol
+    
 # Operator symbols
 UNION_SYM = "+"
 CAT_SYM = "."
@@ -42,33 +45,91 @@ UNION = Operator(UNION_SYM, 1)
 CAT = Operator(CAT_SYM, 2)
 STAR = Operator(STAR_SYM, 3)
 
-class Character_Node:
+OPERATOR_DICT = {
+    UNION_SYM: UNION,
+    STAR_SYM: STAR,
+    CAT_SYM: CAT,
+    ")": None,
+    None: None
+}
+
+class Regex_Node:
+    pass
+
+class Leaf_Node(Regex_Node):
+    pass
+
+class Character_Node(Leaf_Node):
     def __init__(self, char):
         self.char = char
 
     def __repr__(self):
         return self.char
 
-class Star_Node:
+class Lambda_Node(Leaf_Node):
+    def __repr__(self):
+        return LAMBDA_CHAR
+    
+class Null_Node(Leaf_Node):
+    def __repr__(self):
+        return NULL_CHAR
+    
+class Star_Node(Regex_Node):
     def __init__(self, child):
-        self.child = child
+        self.child = self.simplify_child(child)
+
+    def simplify_child(self, node):
+        """remove redunant stars nodes from child of star node"""
+        if isinstance(node, Star_Node):
+            return node.child
+        
+        if isinstance(node, Union_Node):
+            node.left = self.simplify_child(node.left)
+            node.right = self.simplify_child(node.right)
+
+        return node
 
     def __repr__(self):
         return f"({STAR_SYM} {repr(self.child)})"
     
-class Bin_Op_Node:
+class Bin_Op_Node(Regex_Node):
     def __init__(self, left, right):
         self.left = left
         self.right = right
 
     def __repr__(self):
-        return f"({self.op.symbol} {repr(self.left)} {repr(self.right)})"
+        left = repr(self.left)
+        if type(self) == type(self.left):
+            left = left[3:-1]
+        right = repr(self.right)
+        if type(self) == type(self.right):
+            right = right[3:-1]
+
+        return f"({self.op.symbol} {left} {right})"
     
 class Cat_Node(Bin_Op_Node):
     op = CAT
 
+    def make(left, right):
+        if isinstance(left, Lambda_Node):
+            return right
+        if isinstance(right, Lambda_Node):
+            return left
+        if isinstance(left, Null_Node):
+            return left
+        if isinstance(right, Null_Node):
+            return right
+        return Cat_Node(left, right)
+
 class Union_Node(Bin_Op_Node):
     op = UNION
+
+    def make(left, right):
+        if isinstance(left, Null_Node):
+            return right
+        if isinstance(right, Null_Node):
+            return left
+        return Union_Node(left, right)
 
 
 class Stack():
@@ -84,6 +145,8 @@ class Stack():
         return self.stack.pop()
     
     def top(self):
+        if self.empty():
+            return None
         return self.stack[-1]
     
     def size(self):
@@ -92,117 +155,95 @@ class Stack():
     def empty(self):
         return len(self.stack) == 0
     
-    def reduce(self):
-        """Apply the last operation in the stack and push back the result"""
-        right = self.pop()
-        op = self.pop()
-        left = self.pop()
-        if op == CAT:
-            node = Cat_Node(left, right)
-        elif op == UNION:
-            node = Union_Node(left, right)
-        self.push(node)
-
-    def reduce_all(self):
-        """Reduce until stack contains a single value"""
-        # check for operator missing operand
-        if not self.empty() and isinstance(self.top(), Operator):
-            raise SyntaxError("missing operand")
-        
-        while self.size() > 1:
-            self.reduce()
-
-    def push_implied_cat(self):
-        """Insert concatenation operator if top of stack is not an operator"""
-        if not self.empty() and not isinstance(self.top(), Operator):
-            self.push(CAT)
+    def __repr__(self):
+        return repr(self.stack)
 
 class Regex_Parser:
-    """Class for creating parse trees from regex expressions"""
-    def __init__(self, regex):
-        self.buf = Char_Buffer(regex)
-
-    @staticmethod
-    def simplify_star(node):
-        """remove redunant stars nodes from child of star node"""
-        if isinstance(node, Star_Node):
-            return node.child
-        
-        if isinstance(node, Union_Node):
-            node.left = Regex_Parser.simplify_star(node.left)
-            node.right = Regex_Parser.simplify_star(node.right)
-
-        return node
-
-    def _operator(self, c, stack):
-        """handle operator character"""
-        if stack.empty() or isinstance(stack.top(), Operator):
+    def __init__(self, regex=None, buf=None):
+        self.stack = Stack()
+        if regex:
+            self.buf = Char_Buffer(regex)
+            self.inside_paren = False
+        else:
+            self.buf = buf
+            self.inside_paren = True
+    
+    def push_character(self, c):
+        if c == LAMBDA_CHAR:
+            self.push_node(Lambda_Node())
+        elif c == NULL_CHAR:
+            self.push_node(Null_Node())
+        else:
+            self.push_node(Character_Node(c))
+    
+    def push_operator(self, c):
+        """Push operator character"""
+        if self.stack.empty() or isinstance(self.stack.top(), Operator):
             raise SyntaxError("missing operand")
         if c == UNION_SYM:
-            stack.push(UNION)
+            self.stack.push(UNION)
         elif c == CAT_SYM:
-            stack.push(CAT)
+            self.stack.push(CAT)
         else:
             # star operator
-            stack_top = Regex_Parser.simplify_star(stack.pop())
-            stack.push(Star_Node(stack_top))
+            self.push_node(Star_Node(self.stack.pop()))
 
-    def _normal_char(self, c, stack):
-        """handle character without special meaning"""
-        stack.push_implied_cat()
-        prev_op = None
-        if not stack.empty():
-            prev_op = stack.top()
-        stack.push(Character_Node(c))
+    def push_node(self, node):
+        """Push regex parse tree node"""
+        self.push_implied_cat()
 
         # apply prev operation if higher priority than next operation
-        if prev_op is not None and not self.buf.empty():
-            next_char = self.buf.peek()
-            next_op = None
-            if next_char == STAR_SYM:
-                next_op = STAR
-            elif next_char == UNION_SYM:
-                next_op = UNION
-            elif next_char != ")":
-                next_op = CAT
-            if next_op is not None and prev_op.priority >= next_op.priority:
-                stack.reduce()
-    
-    def parse(self, recursive=False):
+        next_char = self.buf.peek()
+        prev_op = self.stack.top()
+        next_op = OPERATOR_DICT.get(next_char, CAT)
+        if prev_op and (not next_op or prev_op.priority >= next_op.priority):
+            self.stack.pop()
+            prev_node = self.stack.pop()
+            if prev_op == CAT:
+                self.push_node(Cat_Node.make(prev_node, node))
+            elif prev_op == UNION:
+                self.push_node(Union_Node.make(prev_node, node))
+        else:
+            self.stack.push(node)
+
+    def push_implied_cat(self):
+        """Insert cat operator between adjacent operands"""
+        if isinstance(self.stack.top(), Regex_Node):
+            self.stack.push(CAT)
+
+    def get_result(self):
+        if self.stack.empty():
+            raise SyntaxError("empty expression")
+        result = self.stack.pop()
+        if isinstance(result, Operator) or not self.stack.empty():
+            raise SyntaxError("malformed expression")
+        return result
+          
+    def parse(self):
         """Create a parse tree from a regex string"""
-        stack = Stack()
         while not self.buf.empty():
             c = self.buf.get_next()
             if c == "(":
-                stack.push_implied_cat()
-                stack.push(self.parse(recursive=True))
+                self.push_implied_cat()
+                self.push_node(Regex_Parser(buf=self.buf).parse())
             elif c == ")":
-                if recursive:
-                    if stack.empty():
-                        raise SyntaxError("empty parenthetical expression")
-                    stack.reduce_all()
-                    return stack.pop()
-                raise SyntaxError("unmatched parenthesis")
-
-            # operator character
+                if not self.inside_paren:
+                    raise SyntaxError("unmatched parenthesis")
+                else:
+                    return self.get_result()
             elif c in OPERATOR_SYM:
-                self._operator(c, stack)
-
-            # character without special meaning
+                self.push_operator(c)
             else:
-                self._normal_char(c, stack)
+                self.push_character(c)
 
-        if not recursive:
-            if stack.empty():
-                raise SyntaxError("empty string")
-            stack.reduce_all()
-            return stack.pop()
-        raise SyntaxError("missing closing parenthesis")
+        # all characters read from buffer
+        if self.inside_paren:
+            raise SyntaxError("missing closing parenthesis")
+        return self.get_result()
 
 def parse(regex):
     return Regex_Parser(regex).parse()
 
 if __name__ == "__main__":
-    print(parse("abc**"))
-    print(parse("(a*+b*+c*+d*+e*)*"))
-
+    print(parse("(ab*+cd)*"))
+    print(parse("ab*c+cd*e"))

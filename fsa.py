@@ -11,58 +11,67 @@ class State:
         self.incoming = defaultdict(set)
 
     def merge(self, src):
-        """add transitions to/from source state into self"""
-        self.final = src.final
-        for char, states in src.transitions.items():
-            for state in states:
-                self.transitions[char].add(state)
-                state.incoming[char].remove(src)
-                state.incoming[char].add(self)
+        """take over all transitions to/from source"""
 
-        for char, states in src.incoming.items():
-            for state in states:
-                self.incoming[char].add(state)
-                state.transitions[char].remove(src)
-                state.transitions[char].add(self)
+        def redirect(char, state):
+            self.add_transition(char, state)
+            state.incoming[char].remove(src)
+
+        def change_origin(char, state):
+            state.transitions[char].remove(src)
+            state.add_transition(char, self)
+
+        src.iterate_over_incoming(change_origin)
+        src.iterate_over_transitions(redirect)
+        self.final = src.final
+
+    def add_transition(self, char, state):
+        self.transitions[char].add(state)
+        state.incoming[char].add(self)
 
     def has_outgoing(self):
         return len(self.transitions) != 0
     
     def has_incoming(self):
         return len(self.incoming) != 0
+    
+    def iterate_over_transitions(self, func):
+        return State._iterate_over(func, self.transitions)
+    
+    def iterate_over_incoming(self, func):
+        return State._iterate_over(func, self.incoming)
 
-    def redir_trans(self, char, old_state, new_state):
-        self.transitions[char].remove(old_state)
-        self.add_transition(char, new_state)
-
-    def add_transition(self, char, state):
-        self.transitions[char].add(state)
-        state.incoming[char].add(self)
+    @staticmethod
+    def _iterate_over(func, state_dict):
+        """Apply func to each transition in state_dict"""
+        for char, state_set in state_dict.items():
+            for state in state_set:
+                func(char, state)
 
     def __repr__(self):
-        s = ""
+        out = ""
         for char, states in self.transitions.items():
             if char == "":
                 char = '""'
-            s += f"{char}: {[s.label for s in states]}, "
-        s += "In: "
+            out += f"{char}: {[s.label for s in states]}, "
+        in_trans = "In: "
         for char, states in self.incoming.items():
-                if char == "":
-                    char = '""'
-                s += f"{char}: {[s.label for s in states]}, "
+            if char == "":
+                char = '""'
+            in_trans += f"{char}: {[s.label for s in states]}, "
 
-        return s
+        return f"{out:25}{in_trans}"
 
 
 class FSA:
     def __init__(self, regex=None, node=None, filename=None):
         if regex is not None:
-            tree = parse(regex)
             self.eval_node(parse(regex))
             self.label_states()
         
         elif node is not None:
             self.eval_node(node)
+            self.label_states()
 
         elif filename is not None:
             self.load_file(filename)
@@ -107,7 +116,7 @@ class FSA:
     def __repr__(self):
         def make_repr(state):
             final = "*" if state.final else ""
-            return f"{state.label}{final} -- {repr(state)}"
+            return f"{state.label}{final:1} -- {repr(state)}"
         
         s = f"Start: {self.init_state.label}\n"
         return s + self.traverse_states(func=make_repr, aggregator="\n".join)
@@ -155,41 +164,52 @@ class FSA:
         left = FSA(node=node.left)
         right = FSA(node=node.right)
         left.final_state.final = False
-        if (right.init_state.has_incoming() and 
-            left.final_state.has_outgoing()):
+        if right.init_state.has_incoming() and left.final_state.has_outgoing():
             left.final_state.add_transition("", right.init_state)
         else:
             left.final_state.merge(right.init_state)
+
         self.init_state = left.init_state
-        self.final_state = right.final_state
+        if right.final_state == right.init_state:
+            self.final_state = left.final_state
+        else:
+            self.final_state = right.final_state
 
     def eval_star_node(self, node):
         """Create FSA from regex star node"""
         child = FSA(node=node.child)
-        for char, state_set in child.final_state.incoming.items():
-            for state in state_set:
-                state.redir_trans(char, child.final_state, child.init_state)
-        self.init_state = child.init_state
-        self.final_state = child.init_state
-        self.init_state.final = True
+        new_init = State(final=True)
+        new_init.add_transition("", child.init_state)
+        child.final_state.add_transition("", new_init)
+        child.final_state.final = False
+        self.init_state = new_init
+        self.final_state = new_init
+        self.final_state.final = True
 
-    def eval_char_node(self, node):
-        """Create FSA from regex character node"""
+    def eval_leaf_node(self, char=None):
+        """Create FSA from character, lambda, or null node"""
         init = State()
         final = State(final=True)
         self.init_state = init
         self.final_state = final
-        init.add_transition(node.char, final)
+        if char is not None:
+            init.add_transition(char, final)
 
     def eval_node(self, node):
         """Create FSA from a regex parse tree"""
         if isinstance(node, Character_Node):
-            self.eval_char_node(node)
+            self.eval_leaf_node(node.char)
 
-        if isinstance(node, Cat_Node):
+        elif isinstance(node, Null_Node):
+            self.eval_leaf_node()
+        
+        elif isinstance(node, Lambda_Node):
+            self.eval_leaf_node("")
+
+        elif isinstance(node, Cat_Node):
             self.eval_cat_node(node)
 
-        if isinstance(node, Union_Node):
+        elif isinstance(node, Union_Node):
             self.eval_union_node(node)
 
         elif isinstance(node, Star_Node):
@@ -248,11 +268,13 @@ class FSA:
             else:
                 print(f"{s} rejected")
         return accepted
-    
+
 if __name__ == "__main__":
-    a = FSA(regex="abc+abd")
+    a = FSA(regex="a+^")
     print(a, "\n")
-    print(a.test("abd", trace=True))
+    # a = FSA(regex="cd*")
+    # print(a, "\n")
+    # print(a.test("abc"))
 
     # a = FSA(filename="a")
     # print(a)
