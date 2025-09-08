@@ -12,15 +12,10 @@
 
 @start
 !
-^: mylabel
+$
+a: mylabel
 
 
 @mylabel
-^: deadend
-
-@deadend
-^: start
-
-@final
-$
+b: start
 

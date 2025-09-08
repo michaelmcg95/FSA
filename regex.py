@@ -45,13 +45,13 @@ UNION = Operator(UNION_SYM, 1)
 CAT = Operator(CAT_SYM, 2)
 STAR = Operator(STAR_SYM, 3)
 
-OPERATOR_DICT = {
-    UNION_SYM: UNION,
-    STAR_SYM: STAR,
-    CAT_SYM: CAT,
-    ")": None,
-    None: None
-}
+# OPERATOR_DICT = {
+#     UNION_SYM: UNION,
+#     STAR_SYM: STAR,
+#     CAT_SYM: CAT,
+#     ")": None,
+#     None: None
+# }
 
 class Regex_Node:
     pass
@@ -193,9 +193,8 @@ class Regex_Parser:
         self.push_implied_cat()
 
         # apply prev operation if higher priority than next operation
-        next_char = self.buf.peek()
         prev_op = self.stack.top()
-        next_op = OPERATOR_DICT.get(next_char, CAT)
+        next_op = self.get_next_op()
         if prev_op and (not next_op or prev_op.priority >= next_op.priority):
             self.stack.pop()
             prev_node = self.stack.pop()
@@ -205,6 +204,16 @@ class Regex_Parser:
                 self.push_node(Union_Node.make(prev_node, node))
         else:
             self.stack.push(node)
+
+    def get_next_op(self):
+        next_char = self.buf.peek()
+        if next_char == ")" or next_char == None:
+            return None
+        if next_char == UNION_SYM:
+            return UNION
+        if next_char == STAR_SYM:
+            return STAR
+        return CAT
 
     def push_implied_cat(self):
         """Insert cat operator between adjacent operands"""
@@ -246,4 +255,4 @@ def parse(regex):
 
 if __name__ == "__main__":
     print(parse("(ab*+cd)*"))
-    print(parse("ab*c+cd*e"))
+    print(parse("ab*c+^+cd*e"))

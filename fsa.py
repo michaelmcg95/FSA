@@ -4,9 +4,8 @@ from collections import defaultdict
 from regex import *
 
 class State:
-    def __init__(self, final=False, label=None):
+    def __init__(self, label=None):
         self.label = label
-        self.final = final
         self.transitions = defaultdict(set)
         self.incoming = defaultdict(set)
 
@@ -23,7 +22,6 @@ class State:
 
         src.iterate_over_incoming(change_incoming)
         src.iterate_over_transitions(change_outgoing)
-        self.final = src.final
 
     def add_transition(self, char, state):
         self.transitions[char].add(state)
@@ -49,19 +47,17 @@ class State:
                 func(char, state)
 
     def __repr__(self):
-        out = ""
-        for char, states in self.transitions.items():
-            if char == "":
-                char = '""'
-            out += f"{char}: {[s.label for s in states]}, "
-        in_trans = "In: "
-        for char, states in self.incoming.items():
-            if char == "":
-                char = '""'
-            in_trans += f"{char}: {[s.label for s in states]}, "
+        def transitions_to_str(transition_dict):
+            s = ""
+            for char, states in transition_dict.items():
+                if char == "":
+                    char = '""'
+                s += f"{char}: [{', '.join([s.label for s in states])}], "
+            return s[:-2]
 
-        return f"{out:25}{in_trans}"
-
+        s = f"Out -> {transitions_to_str(self.transitions):25}"
+        s += f"In <- {transitions_to_str(self.incoming)}"
+        return s
 
 class FSA:
     def __init__(self, regex=None, node=None, filename=None):
@@ -80,7 +76,8 @@ class FSA:
         with open(filename, "r") as file:
             lines = file.readlines()
         lines = [l for l in lines if l[0] not in ('#', '\n')]
-        states = {}
+        state_label_dict = {}
+        self.final_states = set()
         transitions = defaultdict(list)
         label = None
         current_state = None
@@ -90,11 +87,11 @@ class FSA:
             if c == '@':
                 label = words[0][1:]
                 current_state = State(label=label)
-                states[label] = current_state
+                state_label_dict[label] = current_state
             elif c == '!':
                 self.init_state = current_state
             elif c == '$':
-                current_state.final = True
+                self.final_states.add(current_state)
             else:
                 if c == "^":
                     c = ""
@@ -103,19 +100,20 @@ class FSA:
         
         for src_label, trans in transitions.items():
             for c, dest_label in trans:
-                state = states[src_label]
-                dest_state = states[dest_label]
+                state = state_label_dict[src_label]
+                dest_state = state_label_dict[dest_label]
                 state.add_transition(c, dest_state)
 
     def label_states(self):
         for count, state in enumerate(self.get_state_list()):
-            state.label = count
+            state.label = str(count)
 
     def __repr__(self):
-        s = f"Start: {self.init_state.label}\n"
+        s = ""
         for state in self.get_state_list():
-            final = "*" if state.final else ""
-            s += f"{state.label}{final:1} -- {repr(state)}\n"
+            state_type = "i" if state == self.init_state else "-"
+            state_type += "f" if state in self.final_states else "-"
+            s += f"{state_type} {state.label:10} {repr(state)}\n"
         
         return s 
 
@@ -140,59 +138,65 @@ class FSA:
         left = FSA(node=node.left)
         right = FSA(node=node.right)
         for childFSA in left, right:
-            # add new initial state if child's init has incoming transition
             if childFSA.init_state.has_incoming():
                 new_init = State()
                 new_init.add_transition("", childFSA.init_state)
                 childFSA.init_state = new_init
-            # add new final state if child's final has outgoing transition
-            if childFSA.final_state.has_outgoing():
-                new_final = State(final=True)
-                childFSA.final_state.add_transition("", new_final)
-                childFSA.final_state.final = False
-                childFSA.final_state = new_final
         left.init_state.merge(right.init_state)
-        left.final_state.merge(right.final_state)
         self.init_state = left.init_state
-        self.final_state = left.final_state
+        self.final_states = set.union(left.final_states, right.final_states)
+        if right.init_state in self.final_states:
+            self.final_states.remove(right.init_state)
+            self.final_states.add(left.init_state)
 
     def eval_cat_node(self, node):
         """Create FSA from regex cat node"""
         left = FSA(node=node.left)
         right = FSA(node=node.right)
-        left.final_state.final = False
-        if right.init_state.has_incoming() and left.final_state.has_outgoing():
-            left.final_state.add_transition("", right.init_state)
-        else:
-            left.final_state.merge(right.init_state)
-
+        to_merge = []
+        for state in left.final_states:
+            if state.has_outgoing():
+                new_state = State()
+                state.add_transition("", new_state)
+                to_merge.append(new_state)
+            else:
+                to_merge.append(state)
+        for state in to_merge:
+            right.init_state.merge(state)
         self.init_state = left.init_state
-        if right.final_state == right.init_state:
-            self.final_state = left.final_state
-        else:
-            self.final_state = right.final_state
+        self.final_states = right.final_states
+
 
     def eval_star_node(self, node):
         """Create FSA from regex star node"""
         child = FSA(node=node.child)
         self.init_state = child.init_state
-        if (not child.final_state.has_outgoing() and 
-            not child.init_state.has_incoming()):
-            child.init_state.merge(child.final_state)
-            self.final_state = child.init_state
-            self.final_state.final == True
-        else:
-            child.final_state.add_transition("", child.init_state)
-            self.final_state = child.final_state
+        to_merge = []
+        for state in child.final_states:
+            if state != child.init_state:
+                if state.has_outgoing():
+                    new_state = State()
+                    state.add_transition("", new_state)
+                    to_merge.append(new_state)
+                else:
+                    to_merge.append(state)
+        for state in to_merge:
+            child.init_state.merge(state)
+        self.init_state = child.init_state
+        self.final_states = set([child.init_state])
 
     def eval_leaf_node(self, char=None):
         """Create FSA from character, lambda, or null node"""
         init = State()
-        final = State(final=True)
         self.init_state = init
-        self.final_state = final
+        self.final_states = set()
         if char is not None:
-            init.add_transition(char, final)
+            if char == "":
+                final = init
+            else:
+                final = State()
+                init.add_transition(char, final)
+            self.final_states.add(final)
 
     def eval_node(self, node):
         """Create FSA from a regex parse tree"""
@@ -269,13 +273,12 @@ class FSA:
         return accepted
 
 if __name__ == "__main__":
-    a = FSA(regex="(a*bcd*)*")
+    a = FSA(regex="~*")
     print(a)
-    # a = FSA(regex="cd*")
-    # print(a, "\n")
-    # print(a.test("abc"))
+    a = FSA(regex="cd*")
+    print(a)
+    print(a.test("abc"))
 
     # a = FSA(filename="a")
     # print(a)
-    print(a.test("aabcabcdd"))
 
