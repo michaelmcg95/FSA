@@ -1,0 +1,23 @@
+regex: a
+T: a
+F: aa ab x
+
+regex: ab
+T: ab
+F: a b xb ax xy
+
+regex: a+b
+T: a b
+F: ab ba x
+
+regex: a*
+T: ^ a aa aaaaaaaaaaa
+F: b ba aaaaax
+
+regex: ^
+T: ^
+F: a xyz
+
+regex: ~
+T:
+F: ^ a xyz

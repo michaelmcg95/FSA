@@ -246,7 +246,7 @@ class FSA:
             visit_ind[state] = index
 
             # Success: reached end of string in final state
-            if index == len(s) and state.final:
+            if index == len(s) and state in self.final_states:
                 return True
             
             # Try all lambda transitions

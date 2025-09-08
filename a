@@ -7,8 +7,7 @@
 # * inidcates a final state
 # transitions are listed in the form [char]: label1 label2 ...
 # do no separate labels with commas
-# the colon after the character is optional. all characters other than the
-# first in the first word will be ignored.
+# the colon is optional. Any character can be used here.
 # use '^' to indicate a lambda transition (empty string)
 
 @begin
