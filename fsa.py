@@ -3,6 +3,11 @@
 from collections import defaultdict
 from regex import *
 
+LABEL_CHAR = "@"
+COMMENT_CHAR = "#"
+START_CHAR = "!"
+FINAL_CHAR = "*"
+
 class State:
     def __init__(self, label=None):
         self.label = label
@@ -75,28 +80,32 @@ class FSA:
     def load_file(self, filename):
         with open(filename, "r") as file:
             lines = file.readlines()
-        lines = [l for l in lines if l[0] not in ('#', '\n')]
+
+        lines_words = [l.split() for l in lines if l[0] != COMMENT_CHAR]
+        lines_words = [words for words in lines_words if len(words) > 0]
+
         state_label_dict = {}
         self.final_states = set()
         transitions = defaultdict(list)
-        label = None
+
         current_state = None
-        for line in lines:
-            c = line[0]
-            words = line.split()
-            if c == '@':
+        for words in lines_words:
+            first_char = words[0][0]
+            if first_char == LABEL_CHAR:
+                if len(words[0]) < 2:
+                    raise SyntaxError("Missing state label")
                 label = words[0][1:]
                 current_state = State(label=label)
                 state_label_dict[label] = current_state
-            elif c == '!':
+            elif first_char == START_CHAR:
                 self.init_state = current_state
-            elif c == '$':
+            elif first_char == FINAL_CHAR:
                 self.final_states.add(current_state)
             else:
-                if c == "^":
-                    c = ""
+                if first_char == LAMBDA_CHAR:
+                    first_char = ""
                 for word in words[1:]:
-                    transitions[current_state.label].append((c, word))
+                    transitions[current_state.label].append((first_char, word))
         
         for src_label, trans in transitions.items():
             for c, dest_label in trans:
@@ -111,8 +120,8 @@ class FSA:
     def __repr__(self):
         s = ""
         for state in self.get_state_list():
-            state_type = "i" if state == self.init_state else "-"
-            state_type += "f" if state in self.final_states else "-"
+            state_type = START_CHAR if state == self.init_state else "-"
+            state_type += FINAL_CHAR if state in self.final_states else "-"
             s += f"{state_type} {state.label:10} {repr(state)}\n"
         
         return s 
@@ -273,12 +282,12 @@ class FSA:
         return accepted
 
 if __name__ == "__main__":
-    a = FSA(regex="~*")
-    print(a)
-    a = FSA(regex="cd*")
-    print(a)
-    print(a.test("abc"))
-
-    # a = FSA(filename="a")
+    # a = FSA(regex="~*")
     # print(a)
+    # a = FSA(regex="cd*")
+    # print(a)
+    # print(a.test("abc"))
+
+    a = FSA(filename="a")
+    print(a)
 
