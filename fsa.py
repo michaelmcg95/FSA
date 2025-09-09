@@ -66,10 +66,11 @@ class State:
 
 class FSA:
     def __init__(self, regex=None, node=None, filename=None):
+        self.final_states = set()
         if regex is not None:
             self.eval_node(parse(regex))
             self.label_states()
-        
+            
         elif node is not None:
             self.eval_node(node)
             self.label_states()
@@ -85,7 +86,6 @@ class FSA:
         lines_words = [words for words in lines_words if len(words) > 0]
 
         state_label_dict = {}
-        self.final_states = set()
         transitions = defaultdict(list)
 
         current_state = None
@@ -118,6 +118,8 @@ class FSA:
             state.label = str(count)
 
     def __repr__(self):
+        print(f"if {'Label':11}{'Transitions':32}Incoming")
+        print("-"*70)
         s = ""
         for state in self.get_state_list():
             state_type = START_CHAR if state == self.init_state else "-"
@@ -146,14 +148,30 @@ class FSA:
         """Create FSA from regex union node"""
         left = FSA(node=node.left)
         right = FSA(node=node.right)
+        to_merge = []
         for childFSA in left, right:
+            # add new initial state if child init_state has an incoming transition
             if childFSA.init_state.has_incoming():
                 new_init = State()
                 new_init.add_transition("", childFSA.init_state)
                 childFSA.init_state = new_init
+            # mergeable final states have no out trans and are not the init state
+            for fstate in childFSA.final_states:
+                if fstate != childFSA.init_state and not fstate.has_outgoing():
+                    to_merge.append(fstate)
+                else:
+                    self.final_states.add(fstate)
+
+        if len(to_merge) > 1:
+            survivor = to_merge[0]
+            self.final_states.add(survivor)
+            for state in to_merge:
+                survivor.merge(state)
+        elif len(to_merge) == 1:
+            self.final_states.add(to_merge[0])
+
         left.init_state.merge(right.init_state)
         self.init_state = left.init_state
-        self.final_states = set.union(left.final_states, right.final_states)
         if right.init_state in self.final_states:
             self.final_states.remove(right.init_state)
             self.final_states.add(left.init_state)
@@ -192,7 +210,7 @@ class FSA:
         for state in to_merge:
             child.init_state.merge(state)
         self.init_state = child.init_state
-        self.final_states = set([child.init_state])
+        self.final_states.add(child.init_state)
 
     def eval_leaf_node(self, char=None):
         """Create FSA from character, lambda, or null node"""
@@ -282,12 +300,12 @@ class FSA:
         return accepted
 
 if __name__ == "__main__":
-    # a = FSA(regex="~*")
-    # print(a)
+    a = FSA(regex="^+(a*b*)")
+    print(a)
     # a = FSA(regex="cd*")
     # print(a)
     # print(a.test("abc"))
 
-    a = FSA(filename="a")
-    print(a)
+    # a = FSA(filename="a")
+    # print(a)
 
