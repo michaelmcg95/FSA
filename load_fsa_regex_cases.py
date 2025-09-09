@@ -1,19 +1,35 @@
-import regex
+"""Loads regex test cases from file"""
 
-# load test cases from file
-# format is [(regex, {True: [cases...], False: [cases]})...]
+import regex
+from fsa import COMMENT_CHAR
+
+class Regex_Test_Case:
+    def __init__(self):
+        self.regex = None
+        self.parse_tree = None
+        self.accepted = None
+        self.rejected = None
+
 fsa_regex_cases = []
 with open("fsa_test_cases", "r") as file:
     lines = file.readlines()
 regex_str = None
-case_dict = {}
+case = Regex_Test_Case()
 for line in lines:
-    if line == "\n":
-        fsa_regex_cases.append((regex_str, case_dict))
-        case_dict = {}
-    elif line[:5].lower() == "regex":
-        regex_str = line.split()[1]
+    first_char = line[0].lower()
+    if first_char == COMMENT_CHAR:
+        continue
+    if line == "\n" and case.regex is not None:
+        fsa_regex_cases.append(case)
+        case = Regex_Test_Case()
+    elif first_char == "r":
+        case.regex = line.split(":")[1].strip()
+    elif line[0].lower() == "p":
+        case.parse_tree = line.split(":")[1].strip()
     else:
-        expected = True if line[0].lower() == "t" else False
-        cases = ["" if c == regex.LAMBDA_CHAR else c for c in line.split()[1:]]
-        case_dict[expected] = cases
+        words = line.split()
+        test_strings = ["" if c == regex.LAMBDA_CHAR else c for c in words[1:]]
+        if first_char == "t":
+            case.accepted = test_strings
+        else:
+            case.rejected = test_strings

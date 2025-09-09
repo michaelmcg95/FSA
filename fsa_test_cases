@@ -1,23 +1,111 @@
-regex: a
-T: a
-F: aa ab x
+# Test case file format:
 
-regex: ab
-T: ab
-F: a b xb ax xy
+# regex: [regex expression]
+# P: [parse tree string representation]
+# T: [list of strings that should be accepted]
+# F: [list of strings that should be rejected]
 
-regex: a+b
-T: a b
-F: ab ba x
-
-regex: a*
-T: ^ a aa aaaaaaaaaaa
-F: b ba aaaaax
 
 regex: ^
+P: ^
 T: ^
 F: a xyz
 
 regex: ~
+P: ~
 T:
 F: ^ a xyz
+
+regex: a
+P: a
+T: a
+F: aa ab x
+
+regex: a*
+P: (* a)
+T: ^ a aa aaaaaaaaaaa
+F: b ba aaaaax
+
+regex: ab
+P: (. a b)
+T: ab
+F: a b xb ax xy
+
+Regex: (ab)*
+P: (* (. a b))
+T: ^ ab abab ababab
+F: a b x ax abx bx
+
+Regex: ab*
+P: (. a (* b))
+T: a ab abbbbb
+F: b bbbbbb x xb aba abab abx
+
+Regex: (ab*)*
+P: (* (. a (* b)))
+T: ^ a aaa aab ab aba abbaa abab abb abbbabbb abbaaabbabbb
+F: b ba bba bab ax bx abbx
+
+Regex: a*b
+P: (. (* a) b)
+T: b ab aaaab
+F: a aaa ax aba ba bx aax
+
+Regex: (a*b)*
+P: (* (. (* a) b))
+T: ^ b ab aaaab bab baaaaab abaaaab babbab bbbbbb
+F: a ba aaba x xb 
+
+Regex: a*b*
+P: (. (* a) (* b))
+T: ^ a aaa aaab aaabbb b bbb abbbbb
+F: ax abx bx ba bab
+
+Regex: (a*b*)*
+P: (* (. (* a) (* b)))
+T: ^ a aaa aaab aabbaabb ababa b bbb bbba babab bbabaaba
+F: x ax bx abx
+
+Regex: a+b
+P: (+ a b)
+T: a b
+F: ^ ab ba x
+
+Regex: a+^
+P: (+ a ^)
+T: ^ a
+F: aa ax x
+
+Regex: ^+a
+P: (+ ^ a)
+T: ^ a
+F: aa ax x
+
+# Regex:  (a+b)*
+# P:
+# T:
+# F:
+# Regex:  a+b*
+# P:
+# T:
+# F:
+# Regex:  (a+b*)*
+# P:
+# T:
+# F:
+# Regex:  a*+b
+# P:
+# T:
+# F:
+# Regex:  (a*+b)*
+# P:
+# T:
+# F:
+# Regex:  a*+b*
+# P:
+# T:
+# F:
+# Regex:  (a*+b*)*
+# P:
+# T:
+# F:
