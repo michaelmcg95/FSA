@@ -99,9 +99,11 @@ class Bin_Op_Node(Regex_Node):
 
     def __repr__(self):
         left = repr(self.left)
+        right = repr(self.right)
+
+        # simplify (. (. a b) c) and (. a (. b c)) to (. a b c)
         if type(self) == type(self.left):
             left = left[3:-1]
-        right = repr(self.right)
         if type(self) == type(self.right):
             right = right[3:-1]
 
@@ -161,7 +163,7 @@ class Stack():
 class Regex_Parser:
     def __init__(self, regex=None, buf=None):
         self.stack = Stack()
-        if regex:
+        if regex is not None:
             self.buf = Char_Buffer(regex)
             self.inside_paren = False
         else:
@@ -221,6 +223,7 @@ class Regex_Parser:
             self.stack.push(CAT)
 
     def get_result(self):
+        """Get result of finished evaluation"""
         if self.stack.empty():
             raise SyntaxError("empty expression")
         result = self.stack.pop()

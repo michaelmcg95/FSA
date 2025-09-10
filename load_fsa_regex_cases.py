@@ -17,7 +17,7 @@ regex_str = None
 case = Regex_Test_Case()
 for line in lines:
     first_char = line[0].lower()
-    if first_char == COMMENT_CHAR:
+    if first_char in ['-', COMMENT_CHAR]:
         continue
     if line == "\n" and case.regex is not None:
         fsa_regex_cases.append(case)
@@ -31,5 +31,7 @@ for line in lines:
         test_strings = ["" if c == regex.LAMBDA_CHAR else c for c in words[1:]]
         if first_char == "t":
             case.accepted = test_strings
-        else:
+        elif first_char == "f":
             case.rejected = test_strings
+if case.regex is not None:
+    fsa_regex_cases.append(case)

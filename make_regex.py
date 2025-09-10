@@ -1,5 +1,8 @@
 #! /usr/bin/python3
 
+"""Generate all possible regex expressions with a given number
+of unique letters"""
+
 from regex import *
 import string
 

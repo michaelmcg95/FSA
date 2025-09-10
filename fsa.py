@@ -160,12 +160,13 @@ class FSA:
         if right.init_state in self.final_states:
             self.final_states.remove(right.init_state)
             self.final_states.add(left.init_state)
-        self.simplify()
+        self.merge_final_states()
 
-    def simplify(self):
-        """Merge non-init final states with no out transitions"""
+    def merge_final_states(self):
+        """Try to merge final states"""
         to_merge = []
         for fstate in self.final_states:
+            # mergeable final state is not init_state and has no out transition
             if not fstate.has_outgoing() and fstate != self.init_state:
                 to_merge.append(fstate)
         if len(to_merge) > 1:
@@ -311,7 +312,7 @@ class FSA:
         return accepted
 
 if __name__ == "__main__":
-    a = FSA(regex="(a+b*)")
+    a = FSA(regex="(a*+b)c")
     print(a)
     # a = FSA(regex="cd*")
     # print(a)

@@ -23,8 +23,12 @@ F: aa ab x
 
 regex: a*
 P: (* a)
-T: ^ a aa aaaaaaaaaaa
-F: b ba aaaaax
+T: ^ a aa aaaa
+F: b ba aaax
+
+#-------------------------------------------------------------------------------
+# Two letter regexes
+#-------------------------------------------------------------------------------
 
 regex: ab
 P: (. a b)
@@ -38,12 +42,12 @@ F: a b x ax abx bx
 
 Regex: ab*
 P: (. a (* b))
-T: a ab abbbbb
-F: b bbbbbb x xb aba abab abx
+T: a ab abbb
+F: b bbbb x xb aba abab abx
 
 Regex: (ab*)*
 P: (* (. a (* b)))
-T: ^ a aaa aab ab aba abbaa abab abb abbbabbb abbaaabbabbb
+T: ^ a aaa aab ab aba abbaa abab abb abbabb abbaaab
 F: b ba bba bab ax bx abbx
 
 Regex: a*b
@@ -53,12 +57,12 @@ F: a aaa ax aba ba bx aax
 
 Regex: (a*b)*
 P: (* (. (* a) b))
-T: ^ b ab aaaab bab baaaaab abaaaab babbab bbbbbb
+T: ^ b ab aaaab bab baaab abaab babbab bbb
 F: a ba aaba x xb 
 
 Regex: a*b*
 P: (. (* a) (* b))
-T: ^ a aaa aaab aaabbb b bbb abbbbb
+T: ^ a aaa aaab aaabbb b bbb abbb
 F: ax abx bx ba bab
 
 Regex: (a*b*)*
@@ -115,3 +119,131 @@ Regex: ^+a
 P: (+ ^ a)
 T: ^ a
 F: aa ax x
+
+#-------------------------------------------------------------------------------
+# Three letter regexes
+#-------------------------------------------------------------------------------
+
+# two cats
+Regex: abc
+P: (. a b c)
+T: abc
+F: ^ a b c ab ac bc aa aax
+
+Regex: abc*
+P: (. a b (* c))
+T: ab abc abccc
+F: ^ c ca cab ac a abab acab x
+
+Regex: ab*c
+P: (. a (* b) c)
+T: ac abc abbbc
+F: ^ c bac a abb x
+
+Regex: (ab*c)*
+P: (* (. a (* b) c))
+T: ^ ac acac abc abcabc abbbc abbcabc
+F: c bac a abb abca acabb x
+
+Regex: a*bc
+P: (. (* a) b c)
+T: bc abc aaaaabc
+F: ^ b aac aaa bcabc x
+
+# one cat, one union
+Regex: a+bc
+P: (+ a (. b c))
+T: a bc
+F: ^ b c ab abc ac aa bca x
+
+Regex: a+bc*
+P: (+ a (. b (* c)))
+T: a b bc bcccc
+F: ^ c ca cab ac ab abab acab x
+
+Regex: a+b*c
+P: (+ a (. (* b) c))
+T: a c bc bbbbbc
+F: ^ ba b x abc bca
+
+Regex: a*+b*c
+P: (+ (* a) (. (* b) c))
+T: ^ a aa c bc bbbc
+F: b ab ac ax x ca cb cx
+
+Regex: (a+b*c)*
+P: (* (+ a (. (* b) c)))
+T: ^ a c bc bbbbc ac aacc abbca ca cbc cabc caac
+F: x b ab cb cab acb
+
+Regex: a*+bc
+P: (+ (* a) (. b c))
+T: ^ a aaa bc
+F: b c bcb ab ac
+
+Regex: ab+c
+P: (+ (. a b) c)
+T: ab c
+F: ^ a abc ca cb x
+
+Regex: ab+c*
+P: (+ (. a b) (* c))
+T: ^ ab c ccc
+F: abc a b ca cb cab abab x
+
+Regex: ab*+c*
+P: (+ (. a (* b)) (* c))
+T: ^ c ccc a ab abb
+F: x b ac ca cb bc bac abc 
+
+Regex: ab*+c
+P: (+ (. a (* b)) c)
+T: a ab abbb c
+F: ^ b ca x cab abc
+
+Regex: (ab*+c)*
+P: (* (+ (. a (* b)) c))
+T: ^ a ab abbb c aa ac aac abbbc acabbca 
+F: x b bc ba cb abacb cacb
+
+Regex: a*b+c
+P: (+ (. (* a) b) c)
+T: b c ab aaaab
+F: ^ a ca cb cab abc x bx
+
+# two unions
+Regex: a+b+c
+P: (+ a b c)
+T: a b c
+F: ^ ab bc ca x aa
+
+Regex: a+b+c*
+P: (+ a b (* c))
+T: ^ a b c ccc
+F: ax bx x cx aa bc
+
+Regex: (a+b+c)*
+P: (* (+ a b c))
+T: ^ a b c aa ab ac ba bb bc ca cb cc
+F: x ax
+
+# one cat, one union in parentheses
+Regex: (a+b)c
+P: (. (+ a b) c)
+T: ac bc
+F: ^ c abc acb x
+
+Regex: (a*+b)c
+P: (. (+ (* a) b) c)
+T: c ac aac bc
+F: ^ abc acb cac x
+
+Regex: (a*+b*)c*
+P: (. (+ (* a) (* b)) (* c))
+T: ^ a b c aa bb cc ac bc
+F: x ab ca cb abc
+
+Regex: (a*+b)+(c*+d)
+P: (+ (* a) b (* c) d)
+T: ^ a aa b c cc d
+F: ab ac cd cb bc bd ca cb x ax
