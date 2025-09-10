@@ -63,13 +63,48 @@ F: ax abx bx ba bab
 
 Regex: (a*b*)*
 P: (* (. (* a) (* b)))
-T: ^ a aaa aaab aabbaabb ababa b bbb bbba babab bbabaaba
+T: ^ a b aa ab ba bb aaa aab aba abb baa bab bba bbb
 F: x ax bx abx
 
 Regex: a+b
 P: (+ a b)
 T: a b
 F: ^ ab ba x
+
+Regex: (a+b)*
+P: (* (+ a b))
+T: ^ a b aa ab ba bb aaa aab aba abb baa bab bba bbb
+F: x ax bx aax abx bax
+
+Regex: a+b*
+P: (+ a (* b))
+T: ^ a b bb bbbbb
+F: ab abb ba bbba ax bx
+
+Regex: (a+b*)*
+P: (* (+ a b))
+T: ^ a b aa ab ba bb aaa aab aba abb baa bab bba bbb
+F: x ax bx aax abx bax
+
+Regex:  a*+b
+P: (+ (* a) b)
+T: ^ a aaaaa b
+F: ab aax ba bb bx 
+
+Regex: (a*+b)*
+P: (* (+ a b))
+T: ^ a b aa ab ba bb aaa aab aba abb baa bab bba bbb
+F: x ax bx aax abx bax
+
+Regex: a*+b*
+P: (+ (* a) (* b))
+T: ^ a aaaa b bbbb
+F: ab aax abx bax x
+
+Regex: (a*+b*)*
+P: (* (+ a b))
+T: ^ a b aa ab ba bb aaa aab aba abb baa bab bba bbb
+F: x ax bx aax abx bax
 
 Regex: a+^
 P: (+ a ^)
@@ -80,32 +115,3 @@ Regex: ^+a
 P: (+ ^ a)
 T: ^ a
 F: aa ax x
-
-# Regex:  (a+b)*
-# P:
-# T:
-# F:
-# Regex:  a+b*
-# P:
-# T:
-# F:
-# Regex:  (a+b*)*
-# P:
-# T:
-# F:
-# Regex:  a*+b
-# P:
-# T:
-# F:
-# Regex:  (a*+b)*
-# P:
-# T:
-# F:
-# Regex:  a*+b*
-# P:
-# T:
-# F:
-# Regex:  (a*+b*)*
-# P:
-# T:
-# F:

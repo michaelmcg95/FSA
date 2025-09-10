@@ -3,13 +3,13 @@
 from regex import *
 import string
 
-def _make_regex(num_var):
-    if num_var == 1:
+def _make_regex(num_letters):
+    if num_letters == 1:
         return ["{}"]
     else:
-        for num_left in range(1, num_var):
+        for num_left in range(1, num_letters):
             left_exprs = _make_regex(num_left)
-            right_exprs = _make_regex(num_var - num_left)
+            right_exprs = _make_regex(num_letters - num_left)
             result = []
             for l in left_exprs:
                 for r in right_exprs:
@@ -25,15 +25,15 @@ def _make_regex(num_var):
                                 result.append(f"({new_expr}){STAR_SYM}")
         return result
 
-def make_regex(num_var):
-    letters = list(string.ascii_lowercase[:num_var])
-    return [t.format(*letters) for t in _make_regex(num_var)]
+def make_regex(num_letters):
+    letters = list(string.ascii_lowercase[:num_letters])
+    return [t.format(*letters) for t in _make_regex(num_letters)]
 
 if __name__ == "__main__":
-    r = make_regex(2)
+    r = make_regex(3)
     for s in r:
         print("Regex: ", s)
-        print("P:", "T:", "F:", sep="\n")
+        # print("P:", "T:", "F:", sep="\n")
 
 
                                 

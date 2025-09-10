@@ -22,8 +22,8 @@ class State:
             state.incoming[char].remove(src)
 
         def change_incoming(char, state):
-            state.transitions[char].remove(src)
             state.add_transition(char, self)
+            state.transitions[char].remove(src)
 
         src.iterate_over_incoming(change_incoming)
         src.iterate_over_transitions(change_outgoing)
@@ -160,6 +160,19 @@ class FSA:
         if right.init_state in self.final_states:
             self.final_states.remove(right.init_state)
             self.final_states.add(left.init_state)
+        self.simplify()
+
+    def simplify(self):
+        """Merge non-init final states with no out transitions"""
+        to_merge = []
+        for fstate in self.final_states:
+            if not fstate.has_outgoing() and fstate != self.init_state:
+                to_merge.append(fstate)
+        if len(to_merge) > 1:
+            survivor = to_merge[0]
+            for state in to_merge[1:]:
+                survivor.merge(state)
+                self.final_states.remove(state)
 
     def eval_cat_node(self, node):
         """Create FSA from regex cat node"""
@@ -205,23 +218,8 @@ class FSA:
             if state.has_outgoing():
                 state.add_transition("", self.init_state)
             else:
-                for char, state_set in state.incoming.items():
-                    for in_state in state_set:
-                        in_state.add_transition(char, self.init_state)
-                        in_state.transitions[char].remove(state)
+                self.init_state.merge(state)
         self.final_states.add(self.init_state)
-
-    def simplify(self):
-        """Merge non-init final states with no out transitions"""
-        to_merge = []
-        for fstate in self.final_states:
-            if not fstate.has_outgoing() and fstate != self.init_state:
-                to_merge.append(fstate)
-        if len(to_merge) > 1:
-            survivor = to_merge[0]
-            for state in to_merge[1:]:
-                survivor.merge(state)
-                self.final_states.remove(state)
 
     def eval_leaf_node(self, char=None):
         """Create FSA from character, lambda, or null node"""
@@ -256,7 +254,7 @@ class FSA:
         elif isinstance(node, Star_Node):
             self.eval_star_node(node)
 
-        self.simplify()
+
           
     def test(self, s, trace=False):
         def print_trace(trans, label, str):
@@ -313,7 +311,7 @@ class FSA:
         return accepted
 
 if __name__ == "__main__":
-    a = FSA(regex="(a*b)*")
+    a = FSA(regex="(a+b*)")
     print(a)
     # a = FSA(regex="cd*")
     # print(a)
