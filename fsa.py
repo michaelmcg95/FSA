@@ -259,12 +259,27 @@ class FSA:
           
     def test(self, s, trace=False):
         def print_trace(trans, label, str):
-            print(f"{trans:15}{label:<13} {str}")
+            print(f"{label:<13}{trans:15}{str}")
+
+        def try_all_transitions(state, i, try_lambda=False):            
+            if try_lambda:
+                char = ""
+                next_ind = i
+            else:
+                char = s[i]
+                next_ind = i + 1
+            for next_state in state.transitions[char]:
+                if trace:
+                    char = LAMBDA_CHAR if try_lambda else char
+                    print_trace(char, next_state.label, s[next_ind:])
+                if _test(s, next_ind, next_state):
+                    return True
 
         if trace:
-            print("Transition     State         Remaining String")
+            print("State         In Transition  Remaining String")
             print("-" * 50)
-            print_trace("(none)", self.init_state.label, s)
+            print_trace("(start)", self.init_state.label, s)
+
         visit_ind = {}
 
         def _test(s, index, state):
@@ -280,27 +295,24 @@ class FSA:
                 return True
             
             # Try all lambda transitions
-            if "" in state.transitions:
-                for next_state in state.transitions[""]:
-                    if trace:
-                        print_trace('""', next_state.label, s[index:])
-                    if _test(s, index, next_state):
-                        return True 
+            if try_all_transitions(state, index, try_lambda=True):
+                return True
                      
-            # Failed: At end of string but not in final state
+            # At end of string but not in final state
             if index == len(s):
+                if trace:
+                    print(state.label, end="")
+                    print(": At end of string but not in final state.")
                 return False
-                
-            c = s[index]
-            # Try all transitions from current character
-            if c in state.transitions:
-                for next_state in state.transitions[c]:
-                    if trace:
-                        print_trace(c, next_state.label, s[index + 1:])
-                    if _test(s, index + 1, next_state):
-                        return True
+            
+            # Try non-lambda transitions
+            if try_all_transitions(state, index):
+                return True
+
+            # No viable transitions found
             if trace:
-                print("No path from this state. Backtracking to previous.")
+                msg = f"No path from {state.label} with {s[index:]}"
+                print(msg)
             return False
 
         accepted = _test(s, 0, self.init_state)
@@ -312,8 +324,10 @@ class FSA:
         return accepted
 
 if __name__ == "__main__":
-    a = FSA(regex="(a*+b)c")
+    a = FSA(regex="a*b*c")
     print(a)
+    print(a.test('a', trace=True))
+    print(a.test('abc', trace=True))
     # a = FSA(regex="cd*")
     # print(a)
     # print(a.test("abc"))
