@@ -14,7 +14,6 @@ class Make_Tree_Result:
         self.path = path
         self.loops = loops
 
-
 class State:
     def __init__(self, label=None):
         self.label = label
@@ -260,71 +259,6 @@ class FSA:
         elif isinstance(node, Star_Node):
             self.eval_star_node(node)
 
-    def make_parse_tree(self):
-        """Construct a regex parse tree from FSA"""
-        current_path = set()
-        solved = {}
-
-        def cat_to_all(d, finished_loop):
-            for begin, paths in d.items():
-                d[begin] = [Cat_Node(finished_loop, p) for p in paths]
-
-        def make_tree_from(state):
-            loops_to_prev = defaultdict(list)
-
-            if state in current_path:
-                loops_to_prev[state] = [Lambda_Node()]
-                return Make_Tree_Result(loops=loops_to_prev)
-            current_path.add(state)
-
-            # regexes for paths to a final state
-            paths_to_final = []
-            # regexes for paths back to this state
-            loops_here = []
-
-            if state in self.final_states:
-                paths_to_final.append(Lambda_Node())
-            
-            for char, state_set in state.transitions.items():
-                for next_state in state_set:
-                    next_result = solved.get(next_state, None)
-                    if next_result is None:
-                        next_result = make_tree_from(next_state)
-
-                    if not isinstance(next_result.path, Null_Node):
-                        new_path = Cat_Node(parse(char), next_result.path)
-                        paths_to_final.append(new_path)
-
-                    for loop_begin, loop_paths in next_result.loops.items():
-                        for loop_path in loop_paths:
-                            extended_loop = Cat_Node(parse(char), loop_path)
-                            # found a loop back to this state
-                            if loop_begin == state:
-                                finished_loop = Star_Node(extended_loop)
-                                loops_here.append(finished_loop)
-
-                            # extend loop to previously visited state
-                            else:
-                                loops_to_prev[loop_begin].append(extended_loop)
-
-            current_path.remove(state)
-            all_loops = union_all(loops_here)
-            final_path = union_all(paths_to_final)
-
-            # Cat finished loops to all pending back loops
-            if not isinstance(all_loops, Null_Node):
-                cat_to_all(loops_to_prev, all_loops)
-                final_path = Cat_Node(Star_Node(all_loops), final_path)
-
-            result = Make_Tree_Result(loops=loops_to_prev, path=final_path)
-            solved[state] = result
-            return result
-        
-        parse_tree = make_tree_from(self.init_state).path
-        return simplify(parse_tree)
-    
-    def to_regex(self):
-        return self.make_parse_tree().regex()
 
     def test(self, s, trace=False):
         def print_trace(trans, label, str):
@@ -393,12 +327,11 @@ class FSA:
         return accepted
 
 if __name__ == "__main__":
-    # a = FSA(regex="xyz(b+c)*")
-    a = FSA(filename="a")
+    a = FSA(regex="xyz(b+c)*")
+    # a = FSA(filename="a")
     print(a)
-    # print(a.test("ab"))
-    print(a.make_parse_tree())
-    print(a.to_regex())
+
+    # print(a.to_regex())
     # print(a.test('a', trace=True))
     # print(a.test('abc', trace=True))
     # a = FSA(regex="cd*")
