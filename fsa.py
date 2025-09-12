@@ -1,12 +1,19 @@
 #! /usr/bin/python3
 
 from collections import defaultdict
+from functools import reduce
 from regex import *
 
 LABEL_CHAR = "@"
 COMMENT_CHAR = "#"
 START_CHAR = "!"
 FINAL_CHAR = "*"
+
+class Make_Tree_Result:
+    def __init__(self, path=None, loops={}):
+        self.path = path
+        self.loops = loops
+
 
 class State:
     def __init__(self, label=None):
@@ -256,7 +263,6 @@ class FSA:
             self.eval_star_node(node)
 
 
-          
     def test(self, s, trace=False):
         def print_trace(trans, label, str):
             print(f"{label:<13}{trans:15}{str}")
@@ -268,10 +274,10 @@ class FSA:
             else:
                 char = s[i]
                 next_ind = i + 1
+            print_char = LAMBDA_CHAR if try_lambda else char
             for next_state in state.transitions[char]:
                 if trace:
-                    char = LAMBDA_CHAR if try_lambda else char
-                    print_trace(char, next_state.label, s[next_ind:])
+                    print_trace(print_char, next_state.label, s[next_ind:])
                 if _test(s, next_ind, next_state):
                     return True
 
@@ -324,14 +330,12 @@ class FSA:
         return accepted
 
 if __name__ == "__main__":
-    a = FSA(regex="a*b*c")
+    a = FSA(regex="a*")
     print(a)
     print(a.test('a', trace=True))
     print(a.test('abc', trace=True))
-    # a = FSA(regex="cd*")
-    # print(a)
-    # print(a.test("abc"))
+    a = FSA(regex="cd*")
+    print(a)
+    print(a.test("abc"))
 
-    # a = FSA(filename="a")
-    # print(a)
 

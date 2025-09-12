@@ -1,5 +1,7 @@
 #! /usr/bin/python3
 
+from functools import reduce
+
 # special regex characters
 NULL_CHAR = "~"
 LAMBDA_CHAR = "^"
@@ -45,13 +47,6 @@ UNION = Operator(UNION_SYM, 1)
 CAT = Operator(CAT_SYM, 2)
 STAR = Operator(STAR_SYM, 3)
 
-# OPERATOR_DICT = {
-#     UNION_SYM: UNION,
-#     STAR_SYM: STAR,
-#     CAT_SYM: CAT,
-#     ")": None,
-#     None: None
-# }
 
 class Regex_Node:
     pass
@@ -76,18 +71,7 @@ class Null_Node(Leaf_Node):
     
 class Star_Node(Regex_Node):
     def __init__(self, child):
-        self.child = self.simplify_child(child)
-
-    def simplify_child(self, node):
-        """remove redunant stars nodes from child of star node"""
-        if isinstance(node, Star_Node):
-            return node.child
-        
-        if isinstance(node, Union_Node):
-            node.left = self.simplify_child(node.left)
-            node.right = self.simplify_child(node.right)
-
-        return node
+        self.child = child
 
     def __repr__(self):
         return f"({STAR_SYM} {repr(self.child)})"
@@ -101,7 +85,7 @@ class Bin_Op_Node(Regex_Node):
         left = repr(self.left)
         right = repr(self.right)
 
-        # simplify (. (. a b) c) and (. a (. b c)) to (. a b c)
+        # simplify nested operations of the same type -- e.g. (+ a b c)
         if type(self) == type(self.left):
             left = left[3:-1]
         if type(self) == type(self.right):
@@ -112,27 +96,13 @@ class Bin_Op_Node(Regex_Node):
 class Cat_Node(Bin_Op_Node):
     op = CAT
 
-    def make(left, right):
-        if isinstance(left, Lambda_Node):
-            return right
-        if isinstance(right, Lambda_Node):
-            return left
-        if isinstance(left, Null_Node):
-            return left
-        if isinstance(right, Null_Node):
-            return right
-        return Cat_Node(left, right)
-
 class Union_Node(Bin_Op_Node):
     op = UNION
 
-    def make(left, right):
-        if isinstance(left, Null_Node):
-            return right
-        if isinstance(right, Null_Node):
-            return left
-        return Union_Node(left, right)
-
+def union_all(nodes):
+    if len(nodes) == 0:
+        return Null_Node()
+    return reduce(lambda x, y: Union_Node(x, y), nodes[1:], nodes[0])
 
 class Stack():
     """Stack for holding operations and operands in regex string"""
@@ -159,6 +129,46 @@ class Stack():
     
     def __repr__(self):
         return repr(self.stack)
+
+def simplify_parse_tree(node, rm_stars=False):
+    """Remove redundant nodes from regex parse tree"""
+
+    # remove redunant stars nodes from child of star node
+    if isinstance(node, Star_Node):
+        simplified_child = simplify_parse_tree(node.child, rm_stars=True)
+        if isinstance(simplified_child, Null_Node):
+            return Lambda_Node()
+        if rm_stars:
+            return simplified_child
+        node.child = simplified_child
+        return node
+    
+    # binary op nodes
+    if isinstance(node, Bin_Op_Node):
+        rm_stars = False if isinstance(node, Cat_Node) else rm_stars
+        node.left = simplify_parse_tree(node.left, rm_stars)
+        node.right = simplify_parse_tree(node.right, rm_stars)
+
+        # remove null nodes in unions
+        if isinstance(node, Union_Node):
+            if isinstance(node.right, Null_Node):
+                return node.left
+            if isinstance(node.left, Null_Node):
+                return node.right
+        
+        # simplify cat nodes with lambdas or nulls
+        elif isinstance(node, Cat_Node):
+            # remove concatenated lambda nodes
+            if isinstance(node.left, Lambda_Node):
+                return node.right
+            if isinstance(node.right, Lambda_Node):
+                return node.left
+
+            # concatenation with null node yields a null node
+            if (isinstance(node.left, Null_Node) or
+                isinstance(node.right, Null_Node)):
+                return Null_Node()
+    return node
 
 class Regex_Parser:
     def __init__(self, regex=None, buf=None):
@@ -201,9 +211,9 @@ class Regex_Parser:
             self.stack.pop()
             prev_node = self.stack.pop()
             if prev_op == CAT:
-                self.push_node(Cat_Node.make(prev_node, node))
+                self.push_node(Cat_Node(prev_node, node))
             elif prev_op == UNION:
-                self.push_node(Union_Node.make(prev_node, node))
+                self.push_node(Union_Node(prev_node, node))
         else:
             self.stack.push(node)
 
@@ -253,9 +263,15 @@ class Regex_Parser:
             raise SyntaxError("missing closing parenthesis")
         return self.get_result()
 
-def parse(regex):
-    return Regex_Parser(regex).parse()
+def parse(regex, simplify=True):
+    tree = Regex_Parser(regex).parse()
+    if simplify:
+        tree = simplify_parse_tree(tree)
+    return tree
 
 if __name__ == "__main__":
-    print(parse("(ab*+cd)*"))
-    print(parse("ab*c+^+cd*e"))
+    # print(parse("(ab*+cd)**"))
+    # print(parse("(a*+(b+(e+g*))+c*)***"))
+    print(parse("a*"))
+    print(parse("a+~"))
+    # print(parse("ab*c+^+cd*e"))
