@@ -84,7 +84,7 @@ class Star_Node(Regex_Node):
     
     def regex(self):
         if isinstance(self.child, Bin_Op_Node):
-            return f"({self.child.regex()})*"
+            return "({})*".format(self.child.regex())
         return self.child.regex() + "*"
     
 class Bin_Op_Node(Regex_Node):
@@ -158,11 +158,16 @@ def simplify(node, rm_stars=False):
     # remove redunant stars nodes from child of star node
     if isinstance(node, Star_Node):
         simplified_child = simplify(node.child, rm_stars=True)
-        if isinstance(simplified_child, Null_Node):
+        if isinstance(simplified_child, (Lambda_Node, Null_Node)):
             return Lambda_Node()
         if rm_stars:
             return simplified_child
         node.child = simplified_child
+        if isinstance(node.child, Union_Node):
+            if isinstance(node.child.left, Lambda_Node):
+                node.child = node.child.right
+            elif isinstance(node.child.right, Lambda_Node):
+                node.child = node.child.left
         return node
     
     # binary op nodes

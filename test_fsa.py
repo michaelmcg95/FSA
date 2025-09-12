@@ -12,6 +12,7 @@ class Test_FSA_from_regex(unittest.TestCase):
     def test_fsa(self):
         for case in fsa_regex_cases:
             test_fsa = fsa.FSA(regex=case.regex)
+            # test_fsa = fsa.FSA(regex=test_fsa.to_regex())
             for test_string in case.accepted:
                 msg = f"{case.regex} rejected {test_string}"
                 self.assertTrue(test_fsa.test(test_string), msg)
