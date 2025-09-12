@@ -58,18 +58,19 @@ class State:
             for state in state_set:
                 func(char, state)
 
-    def __repr__(self):
+    def __str__(self):
         def transitions_to_str(transition_dict):
             s = ""
             for char, states in transition_dict.items():
-                if char == "":
-                    char = LAMBDA_CHAR
                 s += f"{char}: [{', '.join([s.label for s in states])}], "
             return s[:-2]
 
         s = f"{transitions_to_str(self.transitions):25}"
         s += f"{transitions_to_str(self.incoming)}"
         return s
+    
+    def __repr__(self):
+        return "state " + self.label
 
 class FSA:
     def __init__(self, regex=None, node=None, filename=None):
@@ -131,7 +132,7 @@ class FSA:
         for state in self.get_state_list():
             state_type = START_CHAR if state == self.init_state else "-"
             state_type += FINAL_CHAR if state in self.final_states else "-"
-            s += f"{state_type} {state.label:10} {repr(state)}\n"
+            s += f"{state_type} {state.label:10} {str(state)}\n"
         
         return s 
 
@@ -159,7 +160,7 @@ class FSA:
             # add new initial state if child init_state has an incoming transition
             if childFSA.init_state.has_incoming():
                 new_init = State()
-                new_init.add_transition("", childFSA.init_state)
+                new_init.add_transition(LAMBDA_CHAR, childFSA.init_state)
                 childFSA.init_state = new_init
         self.final_states = left.final_states.union(right.final_states)
         left.init_state.merge(right.init_state)
@@ -201,7 +202,7 @@ class FSA:
             for state in left.final_states:
                 if state.has_outgoing():
                     new_state = State()
-                    state.add_transition("", new_state)
+                    state.add_transition(LAMBDA_CHAR, new_state)
                     state = new_state
                 to_merge.append(state)
         for state in to_merge:
@@ -219,12 +220,12 @@ class FSA:
         child = FSA(node=node.child)
         if child.init_state.has_incoming():
             self.init_state = State()
-            self.init_state.add_transition("", child.init_state)
+            self.init_state.add_transition(LAMBDA_CHAR, child.init_state)
         else:
             self.init_state = child.init_state
         for state in child.final_states:
             if state.has_outgoing():
-                state.add_transition("", self.init_state)
+                state.add_transition(LAMBDA_CHAR, self.init_state)
             else:
                 self.init_state.merge(state)
         self.final_states.add(self.init_state)
@@ -235,7 +236,7 @@ class FSA:
         self.init_state = init
         self.final_states = set()
         if char is not None:
-            if char == "":
+            if char == LAMBDA_CHAR:
                 final = init
             else:
                 final = State()
@@ -251,7 +252,7 @@ class FSA:
             self.eval_leaf_node()
         
         elif isinstance(node, Lambda_Node):
-            self.eval_leaf_node("")
+            self.eval_leaf_node(LAMBDA_CHAR)
 
         elif isinstance(node, Cat_Node):
             self.eval_cat_node(node)
@@ -262,14 +263,13 @@ class FSA:
         elif isinstance(node, Star_Node):
             self.eval_star_node(node)
 
-
     def test(self, s, trace=False):
         def print_trace(trans, label, str):
             print(f"{label:<13}{trans:15}{str}")
 
         def try_all_transitions(state, i, try_lambda=False):            
             if try_lambda:
-                char = ""
+                char = LAMBDA_CHAR
                 next_ind = i
             else:
                 char = s[i]
@@ -330,12 +330,17 @@ class FSA:
         return accepted
 
 if __name__ == "__main__":
-    a = FSA(regex="a*")
+    a = FSA(regex="a+^")
     print(a)
-    print(a.test('a', trace=True))
-    print(a.test('abc', trace=True))
-    a = FSA(regex="cd*")
-    print(a)
-    print(a.test("abc"))
 
+    print(a.to_regex())
+    # print(a.to_regex())
+    # # print(a.test('a', trace=True))
+    # # print(a.test('abc', trace=True))
+    # # a = FSA(regex="cd*")
+    # # print(a)
+    # # print(a.test("abc"))
+    # a = FSA(filename="a")
+    # print(a)
+    # print(a.to_regex())
 

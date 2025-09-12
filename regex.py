@@ -51,8 +51,10 @@ STAR = Operator(STAR_SYM, 3)
 class Regex_Node:
     pass
 
+
 class Leaf_Node(Regex_Node):
-    pass
+    def regex(self):
+        return self.char
 
 class Character_Node(Leaf_Node):
     def __init__(self, char):
@@ -62,10 +64,14 @@ class Character_Node(Leaf_Node):
         return self.char
 
 class Lambda_Node(Leaf_Node):
+    char = LAMBDA_CHAR
+
     def __repr__(self):
         return LAMBDA_CHAR
     
 class Null_Node(Leaf_Node):
+    char = NULL_CHAR
+
     def __repr__(self):
         return NULL_CHAR
     
@@ -75,6 +81,11 @@ class Star_Node(Regex_Node):
 
     def __repr__(self):
         return f"({STAR_SYM} {repr(self.child)})"
+    
+    def regex(self):
+        if isinstance(self.child, Bin_Op_Node):
+            return f"({self.child.regex()})*"
+        return self.child.regex() + "*"
     
 class Bin_Op_Node(Regex_Node):
     def __init__(self, left, right):
@@ -96,8 +107,19 @@ class Bin_Op_Node(Regex_Node):
 class Cat_Node(Bin_Op_Node):
     op = CAT
 
+    def regex(self):
+        args = self.left.regex(), self.right.regex()
+        if isinstance(self.left, Union_Node):
+            return "({}){}".format(*args)
+        if isinstance(self.right, Union_Node):
+            return "{}({})".format(*args)
+        return "{}{}".format(*args)
+        
 class Union_Node(Bin_Op_Node):
     op = UNION
+
+    def regex(self):
+        return f"{self.left.regex()}{self.op}{self.right.regex()}"
 
 def union_all(nodes):
     if len(nodes) == 0:
@@ -130,12 +152,12 @@ class Stack():
     def __repr__(self):
         return repr(self.stack)
 
-def simplify_parse_tree(node, rm_stars=False):
+def simplify(node, rm_stars=False):
     """Remove redundant nodes from regex parse tree"""
 
     # remove redunant stars nodes from child of star node
     if isinstance(node, Star_Node):
-        simplified_child = simplify_parse_tree(node.child, rm_stars=True)
+        simplified_child = simplify(node.child, rm_stars=True)
         if isinstance(simplified_child, Null_Node):
             return Lambda_Node()
         if rm_stars:
@@ -146,8 +168,8 @@ def simplify_parse_tree(node, rm_stars=False):
     # binary op nodes
     if isinstance(node, Bin_Op_Node):
         rm_stars = False if isinstance(node, Cat_Node) else rm_stars
-        node.left = simplify_parse_tree(node.left, rm_stars)
-        node.right = simplify_parse_tree(node.right, rm_stars)
+        node.left = simplify(node.left, rm_stars)
+        node.right = simplify(node.right, rm_stars)
 
         # remove null nodes in unions
         if isinstance(node, Union_Node):
@@ -263,10 +285,10 @@ class Regex_Parser:
             raise SyntaxError("missing closing parenthesis")
         return self.get_result()
 
-def parse(regex, simplify=True):
+def parse(regex, simple=True):
     tree = Regex_Parser(regex).parse()
-    if simplify:
-        tree = simplify_parse_tree(tree)
+    if simple:
+        tree = simplify(tree)
     return tree
 
 if __name__ == "__main__":
