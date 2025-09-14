@@ -3,6 +3,7 @@
 from collections import defaultdict
 from functools import reduce
 from regex import *
+import sys
 
 LABEL_CHAR = "@"
 COMMENT_CHAR = "#"
@@ -123,9 +124,8 @@ class FSA:
             state.label = str(count)
 
     def __repr__(self):
-        print(f"if {'Label':11}{'Outgoing Transitions':25}Incoming Transitions")
-        print("-"*70)
-        s = ""
+        s = f"if {'Label':11}{'Outgoing Transitions':25}Incoming Transitions\n"
+        s += ("-"*70 + "\n")
         for state in self.get_state_list():
             state_type = START_CHAR if state == self.init_state else "-"
             state_type += FINAL_CHAR if state in self.final_states else "-"
@@ -272,26 +272,27 @@ class FSA:
                 char = s[i]
                 next_ind = i + 1
             print_char = LAMBDA_CHAR if try_lambda else char
-            for next_state in state.transitions[char]:
+            for next_state in state.transitions.get(char, ()):
                 if trace:
                     print_trace(print_char, next_state.label, s[next_ind:])
                 if _test(s, next_ind, next_state):
                     return True
+            return False
 
         if trace:
             print("State         In Transition  Remaining String")
             print("-" * 50)
             print_trace("(start)", self.init_state.label, s)
 
-        visit_ind = {}
+        visit_ind = defaultdict(set)
 
         def _test(s, index, state):
             # check if state visited at same index to avoid infinite recursion
-            if visit_ind.get(state, -1) == index:
+            if index in visit_ind[state]:
                 if trace:
-                    print("Backtracking to avoid infinite loop.")
+                    print(f"{state.label}: backtracking to avoid infinite loop.")
                 return False
-            visit_ind[state] = index
+            visit_ind[state].add(index)
 
             # Success: reached end of string in final state
             if index == len(s) and state in self.final_states:
@@ -318,6 +319,8 @@ class FSA:
                 print(msg)
             return False
 
+        if s == LAMBDA_CHAR:
+            s = ""
         accepted = _test(s, 0, self.init_state)
         if trace:
             if accepted:
@@ -327,7 +330,8 @@ class FSA:
         return accepted
 
 if __name__ == "__main__":
-    a = FSA(regex="xyz(b+c)*")
+    # sys.setrecursionlimit(100000)
+    a = FSA(regex="((a*(b+((c*+d)e*)*))*fg)*")
     # a = FSA(filename="a")
     print(a)
 
@@ -336,7 +340,7 @@ if __name__ == "__main__":
     # print(a.test('abc', trace=True))
     # a = FSA(regex="cd*")
     # print(a)
-    # print(a.test("abc"))
+    print(a.test("aaaeaaae", trace=True))
     # a = FSA(filename="a")
     # print(a)
     # print(a.to_regex())

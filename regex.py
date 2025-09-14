@@ -109,9 +109,12 @@ class Cat_Node(Bin_Op_Node):
 
     def regex(self):
         args = self.left.regex(), self.right.regex()
-        if isinstance(self.left, Union_Node):
+        if (isinstance(self.left, Union_Node) and
+            isinstance(self.right, Union_Node)):
+            return "({})({})".format(*args)
+        elif isinstance(self.left, Union_Node):
             return "({}){}".format(*args)
-        if isinstance(self.right, Union_Node):
+        elif isinstance(self.right, Union_Node):
             return "{}({})".format(*args)
         return "{}{}".format(*args)
         
@@ -297,8 +300,9 @@ def parse(regex, simple=True):
     return tree
 
 if __name__ == "__main__":
-    # print(parse("(ab*+cd)**"))
+    print(parse("((a+b)(c+d+e))*"))
+    print(parse("((a+b)(c+d+e))*").regex())
     # print(parse("(a*+(b+(e+g*))+c*)***"))
-    print(parse("a*"))
-    print(parse("a+~"))
+    # print(parse("a*"))
+    # print(parse("a+~"))
     # print(parse("ab*c+^+cd*e"))

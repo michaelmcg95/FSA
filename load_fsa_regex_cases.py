@@ -1,6 +1,5 @@
 """Loads regex test cases from file"""
 
-import regex
 from fsa import COMMENT_CHAR
 
 class Regex_Test_Case:
@@ -28,7 +27,7 @@ for line in lines:
         case.parse_tree = line.split(":")[1].strip()
     else:
         words = line.split()
-        test_strings = ["" if c == regex.LAMBDA_CHAR else c for c in words[1:]]
+        test_strings = words[1:]
         if first_char == "t":
             case.accepted = test_strings
         elif first_char == "f":
