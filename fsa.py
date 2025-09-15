@@ -35,6 +35,45 @@ class State:
         src.iterate_over_incoming(change_incoming)
         src.iterate_over_transitions(change_outgoing)
 
+    def suppress(self):
+        """Reroute all possible in/out transition pairs around self.
+        Assumes flat_transitions and flat_incoming were already created"""
+        loops = []
+        non_loops_out = []
+        for out_val, dest in self.flat_transitions:
+            if dest == self:
+                loops.append(make_node(out_val))
+            else:
+                non_loops_out.append((out_val, dest))
+        non_loops_in = [(in_val, orig) for in_val, orig 
+                        in self.flat_incoming if orig != self]
+        loops_node = Star_Node(reduce(Union_Node, loops, Null_Node()))
+        for out_val, dest in non_loops_out:
+            for in_val, orig, in non_loops_in:
+                in_node, out_node = make_node(in_val), make_node(out_val)
+                new_node = Cat_Node(Cat_Node(in_node, loops_node), out_node)
+                orig.flat_transitions.discard((in_val, self))
+                dest.flat_incoming.discard((out_val, self))
+                orig.flat_transitions.add((new_node, dest))
+                dest.flat_incoming.add((new_node, orig))
+        loops = []
+        # non_loops_out = []
+        # for out_val, dest in self.flat_transitions:
+        #     if dest == self:
+        #         loops.append(out_val)
+        #     else:
+        #         non_loops_out.append((out_val, dest))
+        # non_loops_in = [(in_val, orig) for in_val, orig 
+        #                 in self.flat_incoming if orig != self]
+        # loops_node = Star_Node(reduce(Union_Node, loops, Null_Node()))
+        # for out_val, dest in non_loops_out:
+        #     for in_val, orig, in non_loops_in:
+        #         new_node = Cat_Node(Cat_Node(in_val, loops_node), out_val)
+        #         orig.flat_transitions.discard((in_val, self))
+        #         dest.flat_incoming.discard((out_val, self))
+        #         orig.flat_transitions.add((new_node, dest))
+        #         dest.flat_incoming.add((new_node, orig))
+
     def add_transition(self, char, state):
         self.transitions[char].add(state)
         state.incoming[char].add(self)
@@ -50,6 +89,24 @@ class State:
     
     def iterate_over_incoming(self, func):
         return State._iterate_over(func, self.incoming)
+    
+    def flatten_transitions(self):
+        """Make set of (char, state) tuples from transitions"""
+        self.flat_transitions = State._flatten(self.transitions)
+    
+    def flatten_incoming(self):
+        """Make set of (char, state) tuples from incoming"""
+        self.flat_incoming = State._flatten(self.incoming)
+    
+    @staticmethod
+    def _flatten(state_dict):
+        """Get set of (char, state) pairs from transition dictionary"""
+        all_items = set()
+        def add_item(char, state):
+            all_items.add((char, state))
+            # all_items.add((make_node(char), state))
+        State._iterate_over(add_item, state_dict)
+        return all_items
 
     @staticmethod
     def _iterate_over(func, state_dict):
@@ -259,7 +316,63 @@ class FSA:
         elif isinstance(node, Star_Node):
             self.eval_star_node(node)
 
+    def copy(self):
+        """Make copy of self"""
+        copyFSA = FSA()
+        states = self.get_state_list()
+        states_copies = {}
+        for state in states:
+            copy_state = State(state.label)
+            states_copies[state.label] = copy_state
+        for to_copy in states:
+            def copy_transitions(char, state):
+                state_copy = states_copies[to_copy.label]
+                dest = states_copies[state.label]
+                state_copy.transitions[char].add(dest)
+            def copy_incoming(char, state):
+                state_copy = states_copies[to_copy.label]
+                origin = states_copies[state.label]
+                state_copy.incoming[char].add(origin)
+            to_copy.iterate_over_transitions(copy_transitions)
+            to_copy.iterate_over_incoming(copy_incoming)
+        copyFSA.init_state = states_copies[self.init_state.label]
+        copyFSA.final_states = [states_copies[s.label] for s in self.final_states]
+        return copyFSA
+    
+    def make_safe_init_final(self):
+        """Add states so that init has no incoming transition and
+        there is a single final state with no outgoing transition"""
+        if self.init_state.has_incoming():
+            new_init = State("New_Init")
+            new_init.add_transition(LAMBDA_CHAR, self.init_state)
+            self.init_state = new_init
 
+        new_final = State("New_Final")
+        for fstate in self.final_states:
+            fstate.add_transition(LAMBDA_CHAR, new_final)
+        self.final_states = set([new_final])
+            
+    def to_regex(self):
+        """Create regex accepting the same language as self"""
+        copyFSA = self.copy()
+        copyFSA.make_safe_init_final()
+        states = copyFSA.get_state_list()
+        for s in states:
+            s.flatten_transitions()
+            s.flatten_incoming()
+        
+        states = [s for s in states
+                  if s not in copyFSA.final_states and s != copyFSA.init_state]
+
+        while len(states) > 0:
+            state = states.pop()
+            state.suppress()
+
+        init_out_nodes = [make_node(out_val) for out_val, _ in # remove make node
+                          copyFSA.init_state.flat_transitions]
+        parse_tree = reduce(Union_Node, init_out_nodes, Null_Node())
+        return simplify(parse_tree).regex()
+                    
     def test(self, s, trace=False):
         def print_trace(trans, label, str):
             print(f"{label:<13}{trans:15}{str}")
@@ -330,17 +443,17 @@ class FSA:
         return accepted
 
 if __name__ == "__main__":
-    # sys.setrecursionlimit(100000)
-    a = FSA(regex="((a*(b+((c*+d)e*)*))*fg)*")
+    a = FSA(regex="ab")
+    # a = FSA(regex="((a*(b+((c*+d)e*)*))*fg)*")
     # a = FSA(filename="a")
     print(a)
-
+    print(a.to_regex())
     # print(a.to_regex())
     # print(a.test('a', trace=True))
     # print(a.test('abc', trace=True))
     # a = FSA(regex="cd*")
     # print(a)
-    print(a.test("aaaeaaae", trace=True))
+    # print(a.test("aaaeaaae", trace=True))
     # a = FSA(filename="a")
     # print(a)
     # print(a.to_regex())

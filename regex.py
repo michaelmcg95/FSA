@@ -51,7 +51,6 @@ STAR = Operator(STAR_SYM, 3)
 class Regex_Node:
     pass
 
-
 class Leaf_Node(Regex_Node):
     def regex(self):
         return self.char
@@ -108,15 +107,24 @@ class Cat_Node(Bin_Op_Node):
     op = CAT
 
     def regex(self):
-        args = self.left.regex(), self.right.regex()
+        left, right = self.left.regex(), self.right.regex()
         if (isinstance(self.left, Union_Node) and
             isinstance(self.right, Union_Node)):
-            return "({})({})".format(*args)
+            left, right = f"({left})", f"{right}"
         elif isinstance(self.left, Union_Node):
-            return "({}){}".format(*args)
+            left = f"({left})"
         elif isinstance(self.right, Union_Node):
-            return "{}({})".format(*args)
-        return "{}{}".format(*args)
+            right = f"({right})"
+        return left + right
+        # args = self.left.regex(), self.right.regex()
+        # if (isinstance(self.left, Union_Node) and
+        #     isinstance(self.right, Union_Node)):
+        #     return "({})({})".format(*args)
+        # elif isinstance(self.left, Union_Node):
+        #     return "({}){}".format(*args)
+        # elif isinstance(self.right, Union_Node):
+        #     return "{}({})".format(*args)
+        # return "{}{}".format(*args)
         
 class Union_Node(Bin_Op_Node):
     op = UNION
@@ -124,11 +132,15 @@ class Union_Node(Bin_Op_Node):
     def regex(self):
         return f"{self.left.regex()}{self.op}{self.right.regex()}"
 
-def union_all(nodes):
-    if len(nodes) == 0:
-        return Null_Node()
-    return reduce(lambda x, y: Union_Node(x, y), nodes[1:], nodes[0])
-
+def make_node(val):
+    """Make a character node from value, if it is not already a node"""
+    if isinstance(val, Regex_Node):
+        return val
+    if val == LAMBDA_CHAR:
+        return Lambda_Node()
+    else:
+        return Character_Node(val)
+            
 class Stack():
     """Stack for holding operations and operands in regex string"""
 
