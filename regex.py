@@ -1,6 +1,6 @@
 #! /usr/bin/python3
 
-from functools import reduce
+import string
 
 # special regex characters
 NULL_CHAR = "~"
@@ -108,23 +108,11 @@ class Cat_Node(Bin_Op_Node):
 
     def regex(self):
         left, right = self.left.regex(), self.right.regex()
-        if (isinstance(self.left, Union_Node) and
-            isinstance(self.right, Union_Node)):
-            left, right = f"({left})", f"{right}"
-        elif isinstance(self.left, Union_Node):
+        if isinstance(self.left, Union_Node):
             left = f"({left})"
-        elif isinstance(self.right, Union_Node):
+        if isinstance(self.right, Union_Node):
             right = f"({right})"
         return left + right
-        # args = self.left.regex(), self.right.regex()
-        # if (isinstance(self.left, Union_Node) and
-        #     isinstance(self.right, Union_Node)):
-        #     return "({})({})".format(*args)
-        # elif isinstance(self.left, Union_Node):
-        #     return "({}){}".format(*args)
-        # elif isinstance(self.right, Union_Node):
-        #     return "{}({})".format(*args)
-        # return "{}{}".format(*args)
         
 class Union_Node(Bin_Op_Node):
     op = UNION
@@ -132,14 +120,19 @@ class Union_Node(Bin_Op_Node):
     def regex(self):
         return f"{self.left.regex()}{self.op}{self.right.regex()}"
 
+CHAR_NODES = {c: Character_Node(c) for c in string.printable}
+LAMBDA_NODE = Lambda_Node()
+NULL_NODE = Null_Node()
+
 def make_node(val):
-    """Make a character node from value, if it is not already a node"""
+    """Make a leaf node from value, if it is not already a node"""
     if isinstance(val, Regex_Node):
         return val
     if val == LAMBDA_CHAR:
-        return Lambda_Node()
-    else:
-        return Character_Node(val)
+        return LAMBDA_NODE
+    if val == NULL_CHAR:
+        return NULL_NODE
+    return CHAR_NODES.get(val)
             
 class Stack():
     """Stack for holding operations and operands in regex string"""
@@ -222,14 +215,6 @@ class Regex_Parser:
             self.buf = buf
             self.inside_paren = True
     
-    def push_character(self, c):
-        if c == LAMBDA_CHAR:
-            self.push_node(Lambda_Node())
-        elif c == NULL_CHAR:
-            self.push_node(Null_Node())
-        else:
-            self.push_node(Character_Node(c))
-    
     def push_operator(self, c):
         """Push operator character"""
         if self.stack.empty() or isinstance(self.stack.top(), Operator):
@@ -298,7 +283,7 @@ class Regex_Parser:
             elif c in OPERATOR_SYM:
                 self.push_operator(c)
             else:
-                self.push_character(c)
+                self.push_node(make_node(c))
 
         # all characters read from buffer
         if self.inside_paren:

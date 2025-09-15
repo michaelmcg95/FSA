@@ -3,17 +3,11 @@
 from collections import defaultdict
 from functools import reduce
 from regex import *
-import sys
 
 LABEL_CHAR = "@"
 COMMENT_CHAR = "#"
 START_CHAR = "!"
 FINAL_CHAR = "*"
-
-class Make_Tree_Result:
-    def __init__(self, path=Null_Node(), loops={}):
-        self.path = path
-        self.loops = loops
 
 class State:
     def __init__(self, label=None):
@@ -37,42 +31,24 @@ class State:
 
     def suppress(self):
         """Reroute all possible in/out transition pairs around self.
-        Assumes flat_transitions and flat_incoming were already created"""
+        Assumes GTG_in and GTF_out sets were already"""
         loops = []
         non_loops_out = []
-        for out_val, dest in self.flat_transitions:
+        for out_node, dest in self.GTG_out:
             if dest == self:
-                loops.append(make_node(out_val))
+                loops.append(out_node)
             else:
-                non_loops_out.append((out_val, dest))
-        non_loops_in = [(in_val, orig) for in_val, orig 
-                        in self.flat_incoming if orig != self]
-        loops_node = Star_Node(reduce(Union_Node, loops, Null_Node()))
-        for out_val, dest in non_loops_out:
-            for in_val, orig, in non_loops_in:
-                in_node, out_node = make_node(in_val), make_node(out_val)
+                non_loops_out.append((out_node, dest))
+        non_loops_in = [(in_node, orig) for in_node, orig 
+                        in self.GTG_in if orig != self]
+        loops_node = Star_Node(reduce(Union_Node, loops, NULL_NODE))
+        for out_node, dest in non_loops_out:
+            for in_node, orig, in non_loops_in:
                 new_node = Cat_Node(Cat_Node(in_node, loops_node), out_node)
-                orig.flat_transitions.discard((in_val, self))
-                dest.flat_incoming.discard((out_val, self))
-                orig.flat_transitions.add((new_node, dest))
-                dest.flat_incoming.add((new_node, orig))
-        loops = []
-        # non_loops_out = []
-        # for out_val, dest in self.flat_transitions:
-        #     if dest == self:
-        #         loops.append(out_val)
-        #     else:
-        #         non_loops_out.append((out_val, dest))
-        # non_loops_in = [(in_val, orig) for in_val, orig 
-        #                 in self.flat_incoming if orig != self]
-        # loops_node = Star_Node(reduce(Union_Node, loops, Null_Node()))
-        # for out_val, dest in non_loops_out:
-        #     for in_val, orig, in non_loops_in:
-        #         new_node = Cat_Node(Cat_Node(in_val, loops_node), out_val)
-        #         orig.flat_transitions.discard((in_val, self))
-        #         dest.flat_incoming.discard((out_val, self))
-        #         orig.flat_transitions.add((new_node, dest))
-        #         dest.flat_incoming.add((new_node, orig))
+                orig.GTG_out.discard((in_node, self))
+                orig.GTG_out.add((new_node, dest))
+                dest.GTG_in.add((new_node, orig))
+            dest.GTG_in.discard((out_node, self))
 
     def add_transition(self, char, state):
         self.transitions[char].add(state)
@@ -90,23 +66,17 @@ class State:
     def iterate_over_incoming(self, func):
         return State._iterate_over(func, self.incoming)
     
-    def flatten_transitions(self):
-        """Make set of (char, state) tuples from transitions"""
-        self.flat_transitions = State._flatten(self.transitions)
-    
-    def flatten_incoming(self):
-        """Make set of (char, state) tuples from incoming"""
-        self.flat_incoming = State._flatten(self.incoming)
-    
-    @staticmethod
-    def _flatten(state_dict):
-        """Get set of (char, state) pairs from transition dictionary"""
-        all_items = set()
-        def add_item(char, state):
-            all_items.add((char, state))
-            # all_items.add((make_node(char), state))
-        State._iterate_over(add_item, state_dict)
-        return all_items
+    def make_GTG_sets(self):
+        """Make Generalized Transition Graph sets for this state.
+        Create sets of (Regex_Node, state) tuples"""
+        self.GTG_in = set()
+        self.GTG_out = set()
+        for char, state_set in self.transitions.items():
+            for state in state_set:
+                self.GTG_out.add((make_node(char), state))
+        for char, state_set in self.incoming.items():
+            for state in state_set:
+                self.GTG_in.add((make_node(char), state))
 
     @staticmethod
     def _iterate_over(func, state_dict):
@@ -350,7 +320,7 @@ class FSA:
         new_final = State("New_Final")
         for fstate in self.final_states:
             fstate.add_transition(LAMBDA_CHAR, new_final)
-        self.final_states = set([new_final])
+        self.final_state = new_final
             
     def to_regex(self):
         """Create regex accepting the same language as self"""
@@ -358,19 +328,18 @@ class FSA:
         copyFSA.make_safe_init_final()
         states = copyFSA.get_state_list()
         for s in states:
-            s.flatten_transitions()
-            s.flatten_incoming()
+            s.make_GTG_sets()
         
         states = [s for s in states
-                  if s not in copyFSA.final_states and s != copyFSA.init_state]
+                  if s != copyFSA.final_state and s != copyFSA.init_state]
 
         while len(states) > 0:
             state = states.pop()
             state.suppress()
 
-        init_out_nodes = [make_node(out_val) for out_val, _ in # remove make node
-                          copyFSA.init_state.flat_transitions]
-        parse_tree = reduce(Union_Node, init_out_nodes, Null_Node())
+        init_out_nodes = [out_node for out_node, _ in # remove make node
+                          copyFSA.init_state.GTG_out]
+        parse_tree = reduce(Union_Node, init_out_nodes, NULL_NODE)
         return simplify(parse_tree).regex()
                     
     def test(self, s, trace=False):
@@ -443,7 +412,7 @@ class FSA:
         return accepted
 
 if __name__ == "__main__":
-    a = FSA(regex="ab")
+    a = FSA(regex="aC+b")
     # a = FSA(regex="((a*(b+((c*+d)e*)*))*fg)*")
     # a = FSA(filename="a")
     print(a)
