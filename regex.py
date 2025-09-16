@@ -1,6 +1,7 @@
 #! /usr/bin/python3
 
 import string
+from functools import reduce
 
 # special regex characters
 NULL_CHAR = "~"
@@ -133,7 +134,11 @@ def make_node(val):
     if val == NULL_CHAR:
         return NULL_NODE
     return CHAR_NODES.get(val)
-            
+
+def union_all(regex_nodes):
+    """Create the regex union of a list of nodes"""
+    return reduce(Union_Node, regex_nodes, NULL_NODE)
+        
 class Stack():
     """Stack for holding operations and operands in regex string"""
 

@@ -1,7 +1,6 @@
 #! /usr/bin/python3
 
 from collections import defaultdict
-from functools import reduce
 from regex import *
 
 LABEL_CHAR = "@"
@@ -14,6 +13,8 @@ class State:
         self.label = label
         self.transitions = defaultdict(set)
         self.incoming = defaultdict(set)
+        self.GTG_in = set()
+        self.GTG_out = set()
 
     def merge(self, src):
         """take all transitions to/from source"""
@@ -31,7 +32,7 @@ class State:
 
     def suppress(self):
         """Reroute all possible in/out transition pairs around self.
-        Assumes GTG_in and GTF_out sets were already"""
+        Assumes GTG_in and GTF_out sets were already created."""
         loops = []
         non_loops_out = []
         for out_node, dest in self.GTG_out:
@@ -41,14 +42,16 @@ class State:
                 non_loops_out.append((out_node, dest))
         non_loops_in = [(in_node, orig) for in_node, orig 
                         in self.GTG_in if orig != self]
-        loops_node = Star_Node(reduce(Union_Node, loops, NULL_NODE))
+        loops_node = Star_Node(union_all(loops))
         for out_node, dest in non_loops_out:
             for in_node, orig, in non_loops_in:
                 new_node = Cat_Node(Cat_Node(in_node, loops_node), out_node)
-                orig.GTG_out.discard((in_node, self))
                 orig.GTG_out.add((new_node, dest))
                 dest.GTG_in.add((new_node, orig))
+        for out_node, dest in non_loops_out:
             dest.GTG_in.discard((out_node, self))
+        for in_node, orig, in non_loops_in:
+            orig.GTG_out.discard((in_node, self))
 
     def add_transition(self, char, state):
         self.transitions[char].add(state)
@@ -67,8 +70,7 @@ class State:
         return State._iterate_over(func, self.incoming)
     
     def make_GTG_sets(self):
-        """Make Generalized Transition Graph sets for this state.
-        Create sets of (Regex_Node, state) tuples"""
+        """Make sets of (Regex_Node, state) tuples for this state"""
         self.GTG_in = set()
         self.GTG_out = set()
         for char, state_set in self.transitions.items():
@@ -257,14 +259,13 @@ class FSA:
         """Create FSA from character, lambda, or null node"""
         init = State()
         self.init_state = init
-        self.final_states = set()
-        if char is not None:
-            if char == LAMBDA_CHAR:
-                final = init
-            else:
-                final = State()
+        if char == LAMBDA_CHAR:
+            final = init
+        else:
+            final = State()
+            if char != NULL_CHAR:
                 init.add_transition(char, final)
-            self.final_states.add(final)
+        self.final_states.add(final)
 
     def eval_node(self, node):
         """Create FSA from a regex parse tree"""
@@ -272,7 +273,7 @@ class FSA:
             self.eval_leaf_node(node.char)
 
         elif isinstance(node, Null_Node):
-            self.eval_leaf_node()
+            self.eval_leaf_node(NULL_CHAR)
         
         elif isinstance(node, Lambda_Node):
             self.eval_leaf_node(LAMBDA_CHAR)
@@ -285,61 +286,33 @@ class FSA:
 
         elif isinstance(node, Star_Node):
             self.eval_star_node(node)
-
-    def copy(self):
-        """Make copy of self"""
-        copyFSA = FSA()
-        states = self.get_state_list()
-        states_copies = {}
-        for state in states:
-            copy_state = State(state.label)
-            states_copies[state.label] = copy_state
-        for to_copy in states:
-            def copy_transitions(char, state):
-                state_copy = states_copies[to_copy.label]
-                dest = states_copies[state.label]
-                state_copy.transitions[char].add(dest)
-            def copy_incoming(char, state):
-                state_copy = states_copies[to_copy.label]
-                origin = states_copies[state.label]
-                state_copy.incoming[char].add(origin)
-            to_copy.iterate_over_transitions(copy_transitions)
-            to_copy.iterate_over_incoming(copy_incoming)
-        copyFSA.init_state = states_copies[self.init_state.label]
-        copyFSA.final_states = [states_copies[s.label] for s in self.final_states]
-        return copyFSA
     
-    def make_safe_init_final(self):
+    def GTG_init_final(self):
         """Add states so that init has no incoming transition and
-        there is a single final state with no outgoing transition"""
-        if self.init_state.has_incoming():
-            new_init = State("New_Init")
-            new_init.add_transition(LAMBDA_CHAR, self.init_state)
-            self.init_state = new_init
+        there is a single final state with no outgoing transition. 
+        new states are connected only to the GTG graph."""
+        self.GTG_init = State("New_Init")
+        self.GTG_init.GTG_out.add((LAMBDA_NODE, self.init_state))
+        self.init_state.GTG_in.add((LAMBDA_NODE, self.GTG_init))
 
-        new_final = State("New_Final")
+        self.GTG_final = State("New_Final")
         for fstate in self.final_states:
-            fstate.add_transition(LAMBDA_CHAR, new_final)
-        self.final_state = new_final
+            fstate.GTG_out.add((LAMBDA_NODE, self.GTG_final))
+            self.GTG_final.GTG_in.add((LAMBDA_NODE, fstate))
             
     def to_regex(self):
         """Create regex accepting the same language as self"""
-        copyFSA = self.copy()
-        copyFSA.make_safe_init_final()
-        states = copyFSA.get_state_list()
+        states = self.get_state_list()
         for s in states:
             s.make_GTG_sets()
-        
-        states = [s for s in states
-                  if s != copyFSA.final_state and s != copyFSA.init_state]
+        self.GTG_init_final()
 
         while len(states) > 0:
             state = states.pop()
             state.suppress()
 
-        init_out_nodes = [out_node for out_node, _ in # remove make node
-                          copyFSA.init_state.GTG_out]
-        parse_tree = reduce(Union_Node, init_out_nodes, NULL_NODE)
+        init_out_nodes = [out_node for out_node, _ in self.GTG_init.GTG_out]
+        parse_tree = union_all(init_out_nodes)
         return simplify(parse_tree).regex()
                     
     def test(self, s, trace=False):
@@ -412,7 +385,7 @@ class FSA:
         return accepted
 
 if __name__ == "__main__":
-    a = FSA(regex="aC+b")
+    a = FSA(regex="~")
     # a = FSA(regex="((a*(b+((c*+d)e*)*))*fg)*")
     # a = FSA(filename="a")
     print(a)
