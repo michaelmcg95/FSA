@@ -38,7 +38,7 @@ class Operator:
         return self.symbol
     
 # Operator symbols
-UNION_SYM = "+"
+UNION_SYM = "|"
 CAT_SYM = "."
 STAR_SYM = "*"
 OPERATOR_SYM = UNION_SYM, CAT_SYM, STAR_SYM
@@ -50,7 +50,8 @@ STAR = Operator(STAR_SYM, 3)
 
 
 class Regex_Node:
-    pass
+    def regex(self):
+        pass
 
 class Leaf_Node(Regex_Node):
     def regex(self):
@@ -84,8 +85,8 @@ class Star_Node(Regex_Node):
     
     def regex(self):
         if isinstance(self.child, Bin_Op_Node):
-            return "({})*".format(self.child.regex())
-        return self.child.regex() + "*"
+            return "({})".format(self.child.regex()) + STAR_SYM
+        return self.child.regex() + STAR_SYM
     
 class Bin_Op_Node(Regex_Node):
     def __init__(self, left, right):
@@ -102,10 +103,10 @@ class Bin_Op_Node(Regex_Node):
         if type(self) == type(self.right):
             right = right[3:-1]
 
-        return f"({self.op.symbol} {left} {right})"
+        return f"({self.symbol} {left} {right})"
     
 class Cat_Node(Bin_Op_Node):
-    op = CAT
+    symbol = CAT_SYM
 
     def regex(self):
         left, right = self.left.regex(), self.right.regex()
@@ -116,10 +117,10 @@ class Cat_Node(Bin_Op_Node):
         return left + right
         
 class Union_Node(Bin_Op_Node):
-    op = UNION
+    symbol = UNION_SYM
 
     def regex(self):
-        return f"{self.left.regex()}{self.op}{self.right.regex()}"
+        return f"{self.left.regex()}{self.symbol}{self.right.regex()}"
 
 CHAR_NODES = {c: Character_Node(c) for c in string.printable}
 LAMBDA_NODE = Lambda_Node()

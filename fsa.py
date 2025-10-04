@@ -1,6 +1,7 @@
 #! /usr/bin/python3
 
 from collections import defaultdict
+import xml.etree.ElementTree as ET
 from regex import *
 
 LABEL_CHAR = "@"
@@ -102,7 +103,7 @@ class State:
         return "state " + self.label
 
 class FSA:
-    def __init__(self, regex=None, node=None, filename=None):
+    def __init__(self, regex=None, node=None, filename=None, jflap=None):
         self.final_states = set()
         if regex is not None:
             self.eval_node(parse(regex))
@@ -114,7 +115,30 @@ class FSA:
 
         elif filename is not None:
             self.load_file(filename)
+
+        elif jflap is not None:
+            self.load_jflap(jflap)
     
+    def load_jflap(self, filename):
+        """load from jflap xml file"""
+        tree = ET.parse(filename)
+        automaton = tree.find("automaton")
+        states = {}
+        for elem in automaton:
+            if elem.tag == "state":
+                label = elem.attrib["name"]
+                new_state = State(label)
+                states[elem.attrib["id"]]= new_state
+                if elem.find("initial") is not None:
+                    self.init_state = new_state
+                if elem.find("final") is not None:
+                    self.final_states.add(new_state)
+            elif elem.tag == "transition":
+                from_state = states[elem.find("from").text]
+                to_state = states[elem.find("to").text]
+                char = elem.find("read").text
+                from_state.add_transition(char, to_state)
+                
     def load_file(self, filename):
         with open(filename, "r") as file:
             lines = file.readlines()
@@ -161,6 +185,21 @@ class FSA:
             s += f"{state_type} {state.label:10} {str(state)}\n"
         
         return s 
+    
+    def write_file(self, filename="tg"):
+        """Write transition graph to file"""
+        states = self.get_state_list()
+        with open(filename, "w") as file:
+            for state in states:
+                file.write(LABEL_CHAR + state.label + "\n")
+                if state == self.init_state:
+                    file.write(START_CHAR + "\n")
+                if state in self.final_states:
+                    file.write(FINAL_CHAR + "\n")
+                for char, state_list in state.transitions.items():
+                    dest_states = " ".join([s.label for s in state_list])
+                    file.write(f"{char}: {dest_states}\n")
+                file.write("\n");
 
     def get_state_list(self):
         """Get list of reachable states in DFS traversal order."""
@@ -385,18 +424,23 @@ class FSA:
         return accepted
 
 if __name__ == "__main__":
-    a = FSA(regex="~")
-    # a = FSA(regex="((a*(b+((c*+d)e*)*))*fg)*")
+    # a = FSA(regex="~")
+    # a = FSA(regex="((a*(b|((c*|d)e*)*))*fg)*")
     # a = FSA(filename="a")
-    print(a)
-    print(a.to_regex())
+    # print(a)
+    # print(a.to_regex())
     # print(a.to_regex())
     # print(a.test('a', trace=True))
     # print(a.test('abc', trace=True))
-    # a = FSA(regex="cd*")
+    # a = FSA(regex="a|(ad)")
     # print(a)
     # print(a.test("aaaeaaae", trace=True))
     # a = FSA(filename="a")
     # print(a)
+    # print(a.test("bba", False))
     # print(a.to_regex())
+    a = FSA(jflap="xmltest.jff")
+    print(a)
+    a.write_file()
+
 

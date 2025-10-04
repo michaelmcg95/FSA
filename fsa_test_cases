@@ -70,53 +70,53 @@ P: (* (. (* a) (* b)))
 T: ^ a b aa ab ba bb aaa aab aba abb baa bab bba bbb
 F: x ax bx abx
 
-Regex: a+b
-P: (+ a b)
+Regex: a|b
+P: (| a b)
 T: a b
 F: ^ ab ba x
 
-Regex: (a+b)*
-P: (* (+ a b))
+Regex: (a|b)*
+P: (* (| a b))
 T: ^ a b aa ab ba bb aaa aab aba abb baa bab bba bbb
 F: x ax bx aax abx bax
 
-Regex: a+b*
-P: (+ a (* b))
+Regex: a|b*
+P: (| a (* b))
 T: ^ a b bb bbbbb
 F: ab abb ba bbba ax bx
 
-Regex: (a+b*)*
-P: (* (+ a b))
+Regex: (a|b*)*
+P: (* (| a b))
 T: ^ a b aa ab ba bb aaa aab aba abb baa bab bba bbb
 F: x ax bx aax abx bax
 
-Regex:  a*+b
-P: (+ (* a) b)
+Regex:  a*|b
+P: (| (* a) b)
 T: ^ a aaaaa b
 F: ab aax ba bb bx 
 
-Regex: (a*+b)*
-P: (* (+ a b))
+Regex: (a*|b)*
+P: (* (| a b))
 T: ^ a b aa ab ba bb aaa aab aba abb baa bab bba bbb
 F: x ax bx aax abx bax
 
-Regex: a*+b*
-P: (+ (* a) (* b))
+Regex: a*|b*
+P: (| (* a) (* b))
 T: ^ a aaaa b bbbb
 F: ab aax abx bax x
 
-Regex: (a*+b*)*
-P: (* (+ a b))
+Regex: (a*|b*)*
+P: (* (| a b))
 T: ^ a b aa ab ba bb aaa aab aba abb baa bab bba bbb
 F: x ax bx aax abx bax
 
-Regex: a+^
-P: (+ a ^)
+Regex: a|^
+P: (| a ^)
 T: ^ a
 F: aa ax x
 
-Regex: ^+a
-P: (+ ^ a)
+Regex: ^|a
+P: (| ^ a)
 T: ^ a
 F: aa ax x
 
@@ -151,99 +151,99 @@ T: bc abc aaaaabc
 F: ^ b aac aaa bcabc x
 
 # one cat, one union
-Regex: a+bc
-P: (+ a (. b c))
+Regex: a|bc
+P: (| a (. b c))
 T: a bc
 F: ^ b c ab abc ac aa bca x
 
-Regex: a+bc*
-P: (+ a (. b (* c)))
+Regex: a|bc*
+P: (| a (. b (* c)))
 T: a b bc bcccc
 F: ^ c ca cab ac ab abab acab x
 
-Regex: a+b*c
-P: (+ a (. (* b) c))
+Regex: a|b*c
+P: (| a (. (* b) c))
 T: a c bc bbbbbc
 F: ^ ba b x abc bca
 
-Regex: a*+b*c
-P: (+ (* a) (. (* b) c))
+Regex: a*|b*c
+P: (| (* a) (. (* b) c))
 T: ^ a aa c bc bbbc
 F: b ab ac ax x ca cb cx
 
-Regex: (a+b*c)*
-P: (* (+ a (. (* b) c)))
+Regex: (a|b*c)*
+P: (* (| a (. (* b) c)))
 T: ^ a c bc bbbbc ac aacc abbca ca cbc cabc caac
 F: x b ab cb cab acb
 
-Regex: a*+bc
-P: (+ (* a) (. b c))
+Regex: a*|bc
+P: (| (* a) (. b c))
 T: ^ a aaa bc
 F: b c bcb ab ac
 
-Regex: ab+c
-P: (+ (. a b) c)
+Regex: ab|c
+P: (| (. a b) c)
 T: ab c
 F: ^ a abc ca cb x
 
-Regex: ab+c*
-P: (+ (. a b) (* c))
+Regex: ab|c*
+P: (| (. a b) (* c))
 T: ^ ab c ccc
 F: abc a b ca cb cab abab x
 
-Regex: ab*+c*
-P: (+ (. a (* b)) (* c))
+Regex: ab*|c*
+P: (| (. a (* b)) (* c))
 T: ^ c ccc a ab abb
 F: x b ac ca cb bc bac abc 
 
-Regex: ab*+c
-P: (+ (. a (* b)) c)
+Regex: ab*|c
+P: (| (. a (* b)) c)
 T: a ab abbb c
 F: ^ b ca x cab abc
 
-Regex: (ab*+c)*
-P: (* (+ (. a (* b)) c))
+Regex: (ab*|c)*
+P: (* (| (. a (* b)) c))
 T: ^ a ab abbb c aa ac aac abbbc acabbca 
 F: x b bc ba cb abacb cacb
 
-Regex: a*b+c
-P: (+ (. (* a) b) c)
+Regex: a*b|c
+P: (| (. (* a) b) c)
 T: b c ab aaaab
 F: ^ a ca cb cab abc x bx
 
 # two unions
-Regex: a+b+c
-P: (+ a b c)
+Regex: a|b|c
+P: (| a b c)
 T: a b c
 F: ^ ab bc ca x aa
 
-Regex: a+b+c*
-P: (+ a b (* c))
+Regex: a|b|c*
+P: (| a b (* c))
 T: ^ a b c ccc
 F: ax bx x cx aa bc
 
-Regex: (a+b+c)*
-P: (* (+ a b c))
+Regex: (a|b|c)*
+P: (* (| a b c))
 T: ^ a b c aa ab ac ba bb bc ca cb cc
 F: x ax
 
 # one cat, one union in parentheses
-Regex: (a+b)c
-P: (. (+ a b) c)
+Regex: (a|b)c
+P: (. (| a b) c)
 T: ac bc
 F: ^ c abc acb x
 
-Regex: (a*+b)c
-P: (. (+ (* a) b) c)
+Regex: (a*|b)c
+P: (. (| (* a) b) c)
 T: c ac aac bc
 F: ^ abc acb cac x
 
-Regex: (a*+b*)c*
-P: (. (+ (* a) (* b)) (* c))
+Regex: (a*|b*)c*
+P: (. (| (* a) (* b)) (* c))
 T: ^ a b c aa bb cc ac bc
 F: x ab ca cb abc
 
-Regex: (a*+b)+(c*+d)
-P: (+ (* a) b (* c) d)
+Regex: (a*|b)|(c*|d)
+P: (| (* a) b (* c) d)
 T: ^ a aa b c cc d
 F: ab ac cd cb bc bd ca cb x ax
