@@ -1,0 +1,13 @@
+Accept
+a
+bc
+
+Reject
+^
+b
+ab
+ac
+abc
+bb
+cc
+cb

@@ -32,7 +32,7 @@ if __name__ == "__main__":
         command = words[0]
         if command == "":
             continue
-        if command == "quit":
+        if command in ("exit", "quit"):
             running = False
         elif command == "help":
             print(HELP_TEXT)
@@ -54,7 +54,7 @@ if __name__ == "__main__":
             if len(words) < 3:
                 print("Error: missing argument. Load requires 2 arguments")
             elif words[1] == "file":
-                my_fsa = FSA(filename=words[1])
+                my_fsa = FSA(filename=words[2])
             elif words[1] == "regex":
                 my_fsa = FSA(regex=words[2])
             else:

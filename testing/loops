@@ -1,0 +1,17 @@
+Accept
+a
+ab
+ca
+cccabbb
+bc
+ccbc
+
+Reject
+^
+b
+c
+ba
+bca
+cb
+ccc
+

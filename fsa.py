@@ -137,6 +137,8 @@ class FSA:
                 from_state = states[elem.find("from").text]
                 to_state = states[elem.find("to").text]
                 char = elem.find("read").text
+                if char is None:
+                    char = LAMBDA_CHAR
                 from_state.add_transition(char, to_state)
                 
     def load_file(self, filename):
@@ -439,7 +441,7 @@ if __name__ == "__main__":
     # print(a)
     # print(a.test("bba", False))
     # print(a.to_regex())
-    a = FSA(jflap="xmltest.jff")
+    a = FSA(jflap="testing/lambda_cycles.jff")
     print(a)
     a.write_file()
 
