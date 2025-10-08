@@ -10,7 +10,8 @@ class Regex_Test_Case:
         self.rejected = None
 
 fsa_regex_cases = []
-with open("fsa_test_cases", "r") as file:
+
+with open("testing/regex_test_cases", "r") as file:
     lines = file.readlines()
 regex_str = None
 case = Regex_Test_Case()

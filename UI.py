@@ -1,7 +1,7 @@
 #! /usr/bin/python3
 # User Interface for FSA simulator
 
-from fsa import FSA
+# from fsa import FSA
 
 PROMPT = "> "
 ACCEPT_REJECT = {True: "accept", False: "reject"}
@@ -22,6 +22,17 @@ print: print a text description of the FSA's transition graph.
 regex: generate an equivalent regex from FSA.
 '''
 
+class FSA:
+    """Stub FSA that accepts all strings"""
+    def __init__(self, *args, **kwargs):
+        pass
+    def test(self, *args, **kwargs):
+        return True
+    def __str__(self):
+        return "Stub FSA for UI prototype"
+    def to_regex(self):
+        return "Coming soon."
+    
 if __name__ == "__main__":
     print("Welcome to FSA simulator. Type 'help' for instructions.")
     running = True

@@ -8,6 +8,22 @@ import string
 REJECT_CHAR = "X"
 NUM_CASES = 5
 
+class Failed_Case:
+    def __init__(self, regex, tree, case, expected, actual):
+        self.regex = regex
+        self.tree = tree
+        self.case = case
+        self.expected = expected
+        self.actual = actual
+
+    def __str__(self):
+        s  = f"Regex:    {self.regex}\n"
+        s += f"Tree:     {self.tree}\n"
+        s += f"Case:     {self.case}\n"
+        s += f"Expected: {self.expected}\n"
+        s += f"Actual:   {self.actual}\n"
+        return s
+
 class Parse_Tree_Generator:
     """Generate random regex parse trees"""
     def __init__(self, alphabet_size=26, allow_repeat=False):
@@ -40,6 +56,34 @@ class Parse_Tree_Generator:
     def get_random_parse_tree(self, num_leaves):
         self.next_char_index = 0
         return self._make_random_tree(num_leaves)
+    
+    def run_tests(self, tree_sizes, trees_per_size):
+        """Run tests on a random regex parse tree generator"""
+        failed = []
+        for size in tree_sizes:
+            for _ in range(trees_per_size):
+                tree = self.get_random_parse_tree(size)
+                test_fsa = fsa.FSA(node=simplify(tree))
+                accepted, rejected = make_regex_test_cases(tree)
+                regex = tree.regex()
+                for case_set, expected in ((accepted, True), (rejected, False)):
+                    for case in case_set:
+                        try:
+                            if not test_fsa.test(case) == expected:
+                                failed.append(Failed_Case(
+                                                regex=regex,
+                                                tree=tree,
+                                                case=case,
+                                                expected=expected,
+                                                actual=not expected))
+                        except RecursionError:
+                            failed.append(Failed_Case(
+                                            regex=regex,
+                                            tree=tree,
+                                            case=case,
+                                            expected=expected,
+                                            actual="recursion error"))
+        return failed
 
 def strip_lambda_char(str_set):
     """Strip lambda characters from each string in set. But for strings
@@ -124,37 +168,16 @@ def make_regex_test_cases(parse_tree):
     rejected = strip_lambda_char(rejected)
     return accepted, rejected
 
-def run_tests_on_gen(tree_gen, tree_sizes, trees_per_size):
-    """Run tests on a random regex parse tree generator"""
-    failed = []
-    for size in tree_sizes:
-        for _ in range(trees_per_size):
-            tree = tree_gen.get_random_parse_tree(size)
-            test_fsa = fsa.FSA(node=simplify(tree))
-            accepted, rejected = make_regex_test_cases(tree)
-            regex = tree.regex()
-            for case_set, expected in ((accepted, True), (rejected, False)):
-                for case in case_set:
-                    try:
-                        if not test_fsa.test(case) == expected:
-                            failed.append({"regex": regex,
-                                            "tree": tree,
-                                            "string": case,
-                                            "expected:": expected})
-                    except RecursionError:
-                        print("recursion error")                      
-                        print(test_fsa)
-                        print(tree, regex, case, expected)
-
-    print(f"Testing complete. {len(failed)} tests failed.")
-    for failed_case in failed:
-        print(failed_case)
-
 def run_random_tests(tree_sizes, trees_per_size):
     gen_unique_char = Parse_Tree_Generator(allow_repeat=False)
     gen_repeat_char = Parse_Tree_Generator(alphabet_size=3, allow_repeat=True)
-    run_tests_on_gen(gen_unique_char, tree_sizes, trees_per_size)
-    run_tests_on_gen(gen_repeat_char, tree_sizes, trees_per_size)
+
+    failed = gen_unique_char.run_tests(tree_sizes, trees_per_size)
+    failed += gen_repeat_char.run_tests(tree_sizes, trees_per_size)
+
+    print(f"Testing complete. {len(failed)} tests failed.")
+    for failed_test in failed:
+        print(failed_test)
 
 if __name__ == "__main__":
     run_random_tests([3, 5, 8], 20)

@@ -1,6 +1,6 @@
 #! /usr/bin/python3
 
-"""Converts all flap files in test_fsa directory to text transition graphs"""
+"""Converts all jflap files in test_fsa directory to text transition graphs"""
 import os
 from fsa import FSA
 

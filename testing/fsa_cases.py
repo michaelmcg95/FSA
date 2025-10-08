@@ -3,6 +3,8 @@
 
 import os
 
+TEST_CASES_DIR = "fsa_cases"
+
 class FSA_Test_Case:
     def __init__(self, name, accept, reject):
         self.name = name
@@ -10,9 +12,10 @@ class FSA_Test_Case:
         self.reject = reject
 
 fsa_cases = []
-file_names = [f[:-4] for f in os.listdir("testing") if f[-4:] == ".fsa"]
+os.chdir("testing")
+file_names = [f[:-4] for f in os.listdir(TEST_CASES_DIR) if f[-4:] == ".fsa"]
 for file_name in file_names:
-    with open("testing/" + file_name, "r") as test_strings_file:
+    with open(f"{TEST_CASES_DIR}/{file_name}", "r") as test_strings_file:
         lines = test_strings_file.readlines()
     accept = []
     reject = []
@@ -29,6 +32,7 @@ for file_name in file_names:
             else:
                 reject.append(line)
     fsa_cases.append(FSA_Test_Case(file_name, accept, reject))
+os.chdir("..")
 
 if __name__ == "__main__":
     for case in fsa_cases:

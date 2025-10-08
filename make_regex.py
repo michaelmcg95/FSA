@@ -21,9 +21,9 @@ def _make_regex(num_letters):
                     if len(r) > 2:
                         r = f"({r})"
                     for op in (CAT_SYM, UNION_SYM):
-                        for lst in ("", STAR_SYM):
-                            for rst in ("", STAR_SYM):
-                                new_expr = f"{l}{lst}{op}{r}{rst}"
+                        for lstar in ("", STAR_SYM):
+                            for rstar in ("", STAR_SYM):
+                                new_expr = f"{l}{lstar}{op}{r}{rstar}"
                                 result.append(new_expr)
                                 result.append(f"({new_expr}){STAR_SYM}")
         return result

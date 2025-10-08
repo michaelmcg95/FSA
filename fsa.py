@@ -104,6 +104,7 @@ class State:
 
 class FSA:
     def __init__(self, regex=None, node=None, filename=None, jflap=None):
+        self.init_state = None
         self.final_states = set()
         if regex is not None:
             self.eval_node(parse(regex))
@@ -161,12 +162,18 @@ class FSA:
                 current_state = State(label=label)
                 state_label_dict[label] = current_state
             elif first_char == START_CHAR:
+                if self.init_state is not None:
+                    raise SyntaxError("Multiple initial states")
                 self.init_state = current_state
             elif first_char == FINAL_CHAR:
                 self.final_states.add(current_state)
             else:
                 for word in words[1:]:
                     transitions[current_state.label].append((first_char, word))
+        if self.init_state is None:
+            raise SyntaxError("No initial state")
+        if len(self.final_states) == 0:
+            raise SyntaxError("No final state")
         
         for src_label, trans in transitions.items():
             for c, dest_label in trans:
