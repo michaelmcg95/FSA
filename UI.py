@@ -1,7 +1,13 @@
 #! /usr/bin/python3
+
+# Michael McGuan
+# CS 406 -- Alcon
+# Project Milestone 2
 # User Interface for FSA simulator
+# Due October 10, 2025
 
 # from fsa import FSA
+# using dummy FSA for now
 
 PROMPT = "> "
 ACCEPT_REJECT = {True: "accept", False: "reject"}
@@ -41,8 +47,11 @@ if __name__ == "__main__":
     while running:
         words = input(PROMPT).lower().split()
         command = words[0]
+
+        # skip empty lines
         if command == "":
             continue
+        
         if command in ("exit", "quit"):
             running = False
         elif command == "help":
@@ -58,19 +67,29 @@ if __name__ == "__main__":
         elif command == "test":
             if len(words) < 2:
                 print("Error: no string given. Usage: 'test <string>'")
+            elif my_fsa is None:
+                print("Error: no FSA loaded")
             else:
                 result = my_fsa.test(words[1], trace)
                 print(ACCEPT_REJECT[result])
         elif command == "load":
-            if len(words) < 3:
-                print("Error: missing argument. Load requires 2 arguments")
-            elif words[1] == "file":
-                my_fsa = FSA(filename=words[2])
-            elif words[1] == "regex":
-                my_fsa = FSA(regex=words[2])
-            else:
-                print("Error: unrecognized option. Use 'file' or 'regex'.")
+            try:
+                if len(words) < 3:
+                    print("Error: missing argument. Load requires 2 arguments")
+                elif words[1] == "file":
+                    my_fsa = FSA(filename=words[2])
+                    print("file loaded")
+                elif words[1] == "regex":
+                    my_fsa = FSA(regex=words[2])
+                    print("regex loaded")           
+                else:
+                    print("Error: unrecognized option. Use 'file' or 'regex'.")
+            except SyntaxError as e:
+                print(f"Error: {e}")
         elif command == "regex":
-            print(my_fsa.to_regex())
+            if my_fsa is None:
+                print("Error: no FSA loaded")
+            else:
+                print(my_fsa.to_regex())
         else:
             print(f"Unrecognized command: {command}")

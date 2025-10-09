@@ -69,13 +69,14 @@ class Parse_Tree_Generator:
                 for case_set, expected in ((accepted, True), (rejected, False)):
                     for case in case_set:
                         try:
-                            if not test_fsa.test(case) == expected:
+                            actual = test_fsa.test(case)
+                            if actual != expected:
                                 failed.append(Failed_Case(
                                                 regex=regex,
                                                 tree=tree,
                                                 case=case,
                                                 expected=expected,
-                                                actual=not expected))
+                                                actual=actual))
                         except RecursionError:
                             failed.append(Failed_Case(
                                             regex=regex,
