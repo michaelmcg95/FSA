@@ -44,9 +44,7 @@ class Test_FSA_From_Regex(unittest.TestCase):
                 rt_msg = "FSA->regex->FSA " + msg
                 self.assertFalse(round_trip_fsa.test(test_string), rt_msg)
             self.assertEqual(repr(regex.parse(case.regex)), case.parse_tree)
-
-class Test_Parser_Syntax_Errors(unittest.TestCase):
-    """Test fsa created from regex string"""
+    
     def test_syntax_err(self):
         with open("testing/regex_syntax_errors", "r") as file:
             lines = file.readlines()

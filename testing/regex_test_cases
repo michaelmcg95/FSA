@@ -243,7 +243,25 @@ P: (. (| (* a) (* b)) (* c))
 T: ^ a b c aa bb cc ac bc
 F: x ab ca cb abc
 
+Regex: a(b|c*)
+P: (. a (| b (* c)))
+T: a ab accc
+F: ^ b ccc abc
+
+#-------------------------------------------------------------------------------
+# Regexes with 4 or more letters
+#-------------------------------------------------------------------------------
+Regex: (a|bc*)(a|^)(bc)*
+P: (. (| a (. b (* c))) (| a ^) (* (. b c)))
+T: a aa abc aabc b bbc babc bccc bcccbc bccca bcccabcbc
+F: ^ abab c ca cb bba abcc
+
 Regex: (a*|b)|(c*|d)
 P: (| (* a) b (* c) d)
 T: ^ a aa b c cc d
 F: ab ac cd cb bc bd ca cb x ax
+
+Regex: (a|(b|c))*(d|(e|a))
+P: (. (* (| a b c)) (| d e a))
+T: d ae aa ad bbbe ccca e a
+F: ^ ab abc ade ed ea cde
