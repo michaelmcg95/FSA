@@ -1,9 +1,27 @@
 #! /usr/bin/python3
 
+# Michael McGuan
+# CS 406 -- Alcon
+# Project Milestone 5
+# FSA class for FSA simulator
+# Due October 31, 2025
+
 from collections import defaultdict
 import xml.etree.ElementTree as ET
-from regex import *
 
+# from regex import *
+# using dummy class and function defintions for now
+class Star_Node:
+    pass
+class Cat_Node:
+    pass
+def union_all(nodes):
+    pass
+def make_node(char):
+    pass
+
+NULL_CHAR = "~"
+LAMBDA_CHAR = "^"
 LABEL_CHAR = "@"
 COMMENT_CHAR = "#"
 START_CHAR = "!"
@@ -103,25 +121,18 @@ class State:
         return "state " + self.label
 
 class FSA:
-    def __init__(self, regex=None, node=None, filename=None, jflap=None):
+    def __init__(self, filename=None, jflap=None):
         self.init_state = None
         self.final_states = set()
-        if regex is not None:
-            self.eval_node(parse(regex))
-            self.label_states()
-            
-        elif node is not None:
-            self.eval_node(node)
-            self.label_states()
 
-        elif filename is not None:
+        if filename is not None:
             self.load_file(filename)
 
         elif jflap is not None:
             self.load_jflap(jflap)
     
     def load_jflap(self, filename):
-        """load from jflap xml file"""
+        """Load from jflap xml file"""
         tree = ET.parse(filename)
         automaton = tree.find("automaton")
         states = {}
@@ -143,6 +154,7 @@ class FSA:
                 from_state.add_transition(char, to_state)
                 
     def load_file(self, filename):
+        "Load from text file"
         with open(filename, "r") as file:
             lines = file.readlines()
 
@@ -182,6 +194,7 @@ class FSA:
                 state.add_transition(c, dest_state)
 
     def label_states(self):
+        """Assign numeric labels to states"""
         for count, state in enumerate(self.get_state_list()):
             state.label = str(count)
 
@@ -225,145 +238,9 @@ class FSA:
                         to_visit.append(st)
                 state_list.append(state)
         return state_list
-        
-    def eval_union_node(self, node):
-        """Create FSA from regex union node"""
-        left = FSA(node=node.left)
-        right = FSA(node=node.right)
-        for childFSA in left, right:
-            # add new initial state if child init_state has an incoming transition
-            if childFSA.init_state.has_incoming():
-                new_init = State()
-                new_init.add_transition(LAMBDA_CHAR, childFSA.init_state)
-                childFSA.init_state = new_init
-        self.final_states = left.final_states.union(right.final_states)
-        left.init_state.merge(right.init_state)
-        self.init_state = left.init_state
-        if right.init_state in self.final_states:
-            self.final_states.remove(right.init_state)
-            self.final_states.add(left.init_state)
-        self.merge_final_states()
 
-    def merge_final_states(self):
-        """Try to merge final states"""
-        to_merge = []
-        for fstate in self.final_states:
-            # mergeable final state is not init_state and has no out transition
-            if not fstate.has_outgoing() and fstate != self.init_state:
-                to_merge.append(fstate)
-        if len(to_merge) > 1:
-            survivor = to_merge[0]
-            for state in to_merge[1:]:
-                survivor.merge(state)
-                self.final_states.remove(state)
-
-    def eval_cat_node(self, node):
-        """Create FSA from regex cat node"""
-        left = FSA(node=node.left)
-        right = FSA(node=node.right)
-
-        # merge final states of left node
-        to_merge = []
-
-        # check if left node has a single mergeable final state
-        left_final = list(left.final_states)[0]
-        if (len(left.final_states) == 1 and not 
-            (right.init_state.has_incoming() and left_final.has_outgoing())):
-            to_merge.append(left_final)
-        else:
-            # make final states mergeable
-            for state in left.final_states:
-                if state.has_outgoing():
-                    new_state = State()
-                    state.add_transition(LAMBDA_CHAR, new_state)
-                    state = new_state
-                to_merge.append(state)
-        for state in to_merge:
-            right.init_state.merge(state)
-
-        # if left initial state was merged, use right initial state
-        if left.init_state in to_merge:
-            self.init_state = right.init_state
-        else:
-            self.init_state = left.init_state
-        self.final_states = right.final_states
-
-    def eval_star_node(self, node):
-        """Create FSA from regex star node"""
-        child = FSA(node=node.child)
-        if child.init_state.has_incoming():
-            self.init_state = State()
-            self.init_state.add_transition(LAMBDA_CHAR, child.init_state)
-        else:
-            self.init_state = child.init_state
-        for state in child.final_states:
-            if state.has_outgoing():
-                state.add_transition(LAMBDA_CHAR, self.init_state)
-            else:
-                self.init_state.merge(state)
-        self.final_states.add(self.init_state)
-
-    def eval_leaf_node(self, char=None):
-        """Create FSA from character, lambda, or null node"""
-        init = State()
-        self.init_state = init
-        if char == LAMBDA_CHAR:
-            final = init
-        else:
-            final = State()
-            if char != NULL_CHAR:
-                init.add_transition(char, final)
-        self.final_states.add(final)
-
-    def eval_node(self, node):
-        """Create FSA from a regex parse tree"""
-        if isinstance(node, Character_Node):
-            self.eval_leaf_node(node.char)
-
-        elif isinstance(node, Null_Node):
-            self.eval_leaf_node(NULL_CHAR)
-        
-        elif isinstance(node, Lambda_Node):
-            self.eval_leaf_node(LAMBDA_CHAR)
-
-        elif isinstance(node, Cat_Node):
-            self.eval_cat_node(node)
-
-        elif isinstance(node, Union_Node):
-            self.eval_union_node(node)
-
-        elif isinstance(node, Star_Node):
-            self.eval_star_node(node)
-    
-    def GTG_init_final(self):
-        """Add states so that init has no incoming transition and
-        there is a single final state with no outgoing transition. 
-        new states are connected only to the GTG graph."""
-        self.GTG_init = State("New_Init")
-        self.GTG_init.GTG_out.add((LAMBDA_NODE, self.init_state))
-        self.init_state.GTG_in.add((LAMBDA_NODE, self.GTG_init))
-
-        self.GTG_final = State("New_Final")
-        for fstate in self.final_states:
-            fstate.GTG_out.add((LAMBDA_NODE, self.GTG_final))
-            self.GTG_final.GTG_in.add((LAMBDA_NODE, fstate))
-            
-    def to_regex(self):
-        """Create regex accepting the same language as self"""
-        states = self.get_state_list()
-        for s in states:
-            s.make_GTG_sets()
-        self.GTG_init_final()
-
-        while len(states) > 0:
-            state = states.pop()
-            state.suppress()
-
-        init_out_nodes = [out_node for out_node, _ in self.GTG_init.GTG_out]
-        parse_tree = union_all(init_out_nodes)
-        return simplify(parse_tree).regex()
-                    
     def test(self, s, trace=False):
+        """Test if the automaton accepts a string"""
         def print_trace(trans, label, str):
             print(f"{label:<13}{trans:15}{str}")
 
@@ -431,25 +308,3 @@ class FSA:
             else:
                 print(f"{s} rejected")
         return accepted
-
-if __name__ == "__main__":
-    # a = FSA(regex="~")
-    a = FSA(regex="((a*(b|((c*|d)e*)*))*fg)*")
-    # a = FSA(filename="a")
-    print(a)
-    # print(a.to_regex())
-    # print(a.to_regex())
-    # print(a.test('a', trace=True))
-    # print(a.test('abc', trace=True))
-    # a = FSA(regex="a|(ad)")
-    # print(a)
-    # print(a.test("aaaeaaae", trace=True))
-    # a = FSA(filename="a")
-    # print(a)
-    # print(a.test("bba", False))
-    # print(a.to_regex())
-    # a = FSA(jflap="testing/lambda_cycles.jff")
-    # print(a)
-    # a.write_file()
-
-
