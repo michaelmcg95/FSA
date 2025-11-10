@@ -1,5 +1,11 @@
 #! /usr/bin/python3
 
+# Michael McGuan
+# CS 406 -- Alcon
+# Project Milestone 6
+# Regex parser for FSA simulator
+# Due November 6, 2025
+
 import string
 from functools import reduce
 
@@ -169,11 +175,11 @@ class Stack():
 def simplify(node, rm_stars=False):
     """Remove redundant nodes from regex parse tree"""
 
-    # remove redunant stars nodes from child of star node
+    # remove redunant star nodes from child of star node
     if isinstance(node, Star_Node):
         simplified_child = simplify(node.child, rm_stars=True)
         if isinstance(simplified_child, (Lambda_Node, Null_Node)):
-            return Lambda_Node()
+            return LAMBDA_NODE
         if rm_stars:
             return simplified_child
         node.child = simplified_child
@@ -208,7 +214,7 @@ def simplify(node, rm_stars=False):
             # concatenation with null node yields a null node
             if (isinstance(node.left, Null_Node) or
                 isinstance(node.right, Null_Node)):
-                return Null_Node()
+                return NULL_NODE
     return node
 
 class Regex_Parser:
@@ -303,9 +309,11 @@ def parse(regex, simple=True):
     return tree
 
 if __name__ == "__main__":
-    print(parse("((a+b)(c+d+e))*"))
-    print(parse("((a+b)(c+d+e))*").regex())
-    # print(parse("(a*+(b+(e+g*))+c*)***"))
-    # print(parse("a*"))
-    # print(parse("a+~"))
-    # print(parse("ab*c+^+cd*e"))
+    print(parse("((a|b)(c|d*|e))*"))
+    print(parse("((a|b)(c|d*|e))*").regex())
+    print(parse("(a*|(b|(e|g*))|c*)***"))
+    print(parse("a*"))
+    print(parse("a|~"))
+    print(parse("ab*c|^|cd*e"))
+    print(parse("(^)*"))
+    print(parse("a~"))

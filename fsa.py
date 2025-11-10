@@ -54,6 +54,30 @@ class State:
         for in_node, orig, in non_loops_in:
             orig.GTG_out.discard((in_node, self))
 
+    def find_all_reachable(self, char, visited=None):
+        """Get all states reachable by consuming char"""
+        if visited is None:
+            visited = set()
+        # base case: state already visited
+        if self in visited:
+            return set()
+        
+        states = set()
+        if char == LAMBDA_CHAR:
+            states.add(self)
+        
+        # try transitions on char
+        if char != LAMBDA_CHAR:
+            for next_state in self.outgoing[char]:
+                states |= next_state.find_all_reachable(LAMBDA_CHAR, visited)
+
+        # try lambda-transitions
+        visited.add(self)
+        for next_state in self.outgoing[LAMBDA_CHAR]:
+            states |= next_state.find_all_reachable(char, visited)
+
+        return states
+
     def add_transition(self, char, state):
         self.outgoing[char].add(state)
         state.incoming[char].add(self)
@@ -88,19 +112,28 @@ class State:
             for state in state_set:
                 func(char, state)
 
-    def __str__(self):
-        def transitions_to_str(transition_dict):
-            s = ""
-            for char, states in transition_dict.items():
-                s += f"{char}: [{', '.join([s.label for s in states])}], "
-            return s[:-2]
+    def trans_str(self, dir='out'):
+        """Convert transitions to string"""
+        transition_dict = self.outgoing if dir=='out' else self.incoming
+        s = ""
+        for char, states in transition_dict.items():
+            s += f"{char}: [{', '.join([s.label for s in states])}], "
+        return s[:-2]
 
-        s = f"{transitions_to_str(self.outgoing):25}"
-        s += f"{transitions_to_str(self.incoming)}"
-        return s
+    # I think I can delete this now
+    # def __str__(self):
+    #     def transitions_to_str(transition_dict):
+    #         s = ""
+    #         for char, states in transition_dict.items():
+    #             s += f"{char}: [{', '.join([s.label for s in states])}], "
+    #         return s[:-2]
+
+    #     s = f"{transitions_to_str(self.outgoing):25}"
+    #     s += f"{transitions_to_str(self.incoming)}"
+    #     return s
     
     def __repr__(self):
-        return "state " + self.label
+        return self.label
 
 class FSA:
     def __init__(self, regex=None, node=None, filename=None, jflap=None):
@@ -191,7 +224,8 @@ class FSA:
         for state in self.get_state_list():
             state_type = START_CHAR if state == self.init_state else "-"
             state_type += FINAL_CHAR if state in self.final_states else "-"
-            s += f"{state_type} {state.label:10} {str(state)}\n"
+            s += f"{state_type} {repr(state):10}"
+            s += f"{state.trans_str("out"):25} {state.trans_str("in")}\n"
         
         return s 
     
@@ -431,12 +465,63 @@ class FSA:
             else:
                 print(f"{s} rejected")
         return accepted
+    
+    def get_alphabet(self):
+        """Get set of characters consumed in transitions"""
+        states = self.get_state_list()
+        alph =  reduce(set.union, [set(s.outgoing.keys()) for s in states], set())
+        return alph - {LAMBDA_CHAR}
+    
+    def to_dfa(self):
+        """Make a dfa equivalent to self"""
+        dfa = FSA()
+        alphabet = self.get_alphabet()
+        complete = {}
+        pending = {}
+        init_states = self.init_state.find_all_reachable(LAMBDA_CHAR)
+        dfa.init_state = State(str(init_states))
+        pending[frozenset(init_states)] = dfa.init_state
+        while pending:
+            label, state = pending.popitem()
+            print("now processing", state.label)
+            for char in alphabet:
+                print("char: ", char)
+                reachable_states = set()
+                for nfa_state in label:
+                    print("nfa state: ", nfa_state)
+                    reachable_states |= nfa_state.find_all_reachable(char)
+                print(char, "can reach", reachable_states)
+                # freeze reachable_states to make it hashable
+                reachable_states = frozenset(reachable_states)
+                if label == reachable_states:
+                    state.add_transition(char, state)
+                elif reachable_states in complete:
+                    print("state already exists and is complete: adding transition")
+                    state.add_transition(char, complete[reachable_states])
+                elif reachable_states in pending:
+                    print("state exists in pending: adding transition")
+                    state.add_transition(char, pending[reachable_states])
+                else:
+                    print("creating new state: ", reachable_states)
+                    new_label = '{}'
+                    if reachable_states:
+                        new_label = str(set(reachable_states))
+                    new_state = State(new_label)
+                    pending[frozenset(reachable_states)] = new_state
+                    state.add_transition(char, new_state)
+            complete[label] = state
+            
+
+        return dfa
+
 
 if __name__ == "__main__":
     # a = FSA(regex="~")
-    a = FSA(regex="((a*(b|((c*|d)e*)*))*fg)*")
+    a = FSA(filename='dfa_test2')
+    dfa = a.to_dfa()
+    print(dfa)
+    # print(a.init_state.find_all_reachable('a'))
     # a = FSA(filename="a")
-    print(a)
     # print(a.to_regex())
     # print(a.to_regex())
     # print(a.test('a', trace=True))
