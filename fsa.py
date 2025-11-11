@@ -12,10 +12,18 @@ FINAL_CHAR = "*"
 class State:
     def __init__(self, label=""):
         self.label = label
+
+    def __repr__(self):
+        return self.label
+    
+
+class NFA_State(State):
+    def __init__(self, *args, **kwargs):
         self.outgoing = defaultdict(set)
         self.incoming = defaultdict(set)
         self.GTG_in = set()
         self.GTG_out = set()
+        super().__init__(*args, **kwargs)
 
     def merge(self, src):
         """take all transitions to/from source"""
@@ -89,10 +97,10 @@ class State:
         return len(self.incoming) != 0
     
     def iterate_over_outgoing(self, func):
-        return State._iterate_over(func, self.outgoing)
+        return NFA_State._iterate_over(func, self.outgoing)
     
     def iterate_over_incoming(self, func):
-        return State._iterate_over(func, self.incoming)
+        return NFA_State._iterate_over(func, self.incoming)
     
     def make_GTG_sets(self):
         """Make sets of (Regex_Node, state) tuples for this state"""
@@ -112,34 +120,38 @@ class State:
             for state in state_set:
                 func(char, state)
 
-    def trans_str(self, in_dfa, dir='out'):
-        """Convert transitions to string"""
-        transition_dict = self.outgoing if dir=='out' else self.incoming
+    def __str__(self):
+        """Convert outgoing transitions to string"""
         s = ""
-        for char, states in transition_dict.items():
-            s += f"{char}: "
-            next_states = ', '.join([s.label for s in states])
-            if not in_dfa:
-                next_states = f"[{next_states}]"
-            s += next_states + ", "
+        for char, states in self.outgoing.items():
+            s += f"{char}: [{', '.join([s.label for s in states])}], "
         return s[:-2]
-
-    # I think I can delete this now
-    # def __str__(self):
-    #     def transitions_to_str(transition_dict):
-    #         s = ""
-    #         for char, states in transition_dict.items():
-    #             s += f"{char}: [{', '.join([s.label for s in states])}], "
-    #         return s[:-2]
-
-    #     s = f"{transitions_to_str(self.outgoing):25}"
-    #     s += f"{transitions_to_str(self.incoming)}"
-    #     return s
     
-    def __repr__(self):
-        return self.label
+class DFA_State(State):
+    def __init__(self, *args, **kwargs):
+        self.transitions = {}
+        super().__init__(*args, **kwargs)
+
+    def __str__(self):
+        s = ""
+        for char, state in self.transitions.items():
+            s += f"{char}: {repr(state)}, "
+        return s[:-2]
+    
+    def add_transition(self, char, state):
+        self.transitions[char] = state
 
 class FSA:
+    def __repr__(self):
+        s = f"if {'Label':15}{'Transitions'}\n{"-"*70}\n"
+        for state in self.get_state_list():
+            state_type = START_CHAR if state == self.init_state else "-"
+            state_type += FINAL_CHAR if state in self.final_states else "-"
+            s += f"{state_type} {repr(state):15}{str(state)}\n"
+        
+        return s 
+
+class NFA(FSA):
     def __init__(self, regex=None, node=None, filename=None, jflap=None):
         self.init_state = None
         self.final_states = set()
@@ -158,9 +170,6 @@ class FSA:
 
         elif jflap is not None:
             self.load_jflap(jflap)
-
-        if self.init_state:
-            self.is_dfa = self.check_if_dfa()
     
     def load_jflap(self, filename):
         """load from jflap xml file"""
@@ -170,7 +179,7 @@ class FSA:
         for elem in automaton:
             if elem.tag == "state":
                 label = elem.attrib["name"]
-                new_state = State(label)
+                new_state = NFA_State(label)
                 states[elem.attrib["id"]]= new_state
                 if elem.find("initial") is not None:
                     self.init_state = new_state
@@ -201,7 +210,7 @@ class FSA:
                 if len(words[0]) < 2:
                     raise SyntaxError("Missing state label")
                 label = words[0][1:]
-                current_state = State(label=label)
+                current_state = NFA_State(label=label)
                 state_label_dict[label] = current_state
             elif first_char == START_CHAR:
                 if self.init_state is not None:
@@ -227,15 +236,7 @@ class FSA:
         for count, state in enumerate(self.get_state_list()):
             state.label = str(count)
 
-    def __repr__(self):
-        s = f"if {'Label':15}{'Outgoing Transitions'}\n{"-"*70}\n"
-        for state in self.get_state_list():
-            state_type = START_CHAR if state == self.init_state else "-"
-            state_type += FINAL_CHAR if state in self.final_states else "-"
-            s += f"{state_type} {repr(state):15}"
-            s += f"{state.trans_str(self.is_dfa, "out")}\n"
-        
-        return s 
+
     
     def write_file(self, filename="tg"):
         """Write transition graph to file"""
@@ -270,12 +271,12 @@ class FSA:
         
     def eval_union_node(self, node):
         """Create FSA from regex union node"""
-        left = FSA(node=node.left)
-        right = FSA(node=node.right)
+        left = NFA(node=node.left)
+        right = NFA(node=node.right)
         for childFSA in left, right:
             # add new initial state if child init_state has an incoming transition
             if childFSA.init_state.has_incoming():
-                new_init = State()
+                new_init = NFA_State()
                 new_init.add_transition(LAMBDA_CHAR, childFSA.init_state)
                 childFSA.init_state = new_init
         self.final_states = left.final_states.union(right.final_states)
@@ -301,8 +302,8 @@ class FSA:
 
     def eval_cat_node(self, node):
         """Create FSA from regex cat node"""
-        left = FSA(node=node.left)
-        right = FSA(node=node.right)
+        left = NFA(node=node.left)
+        right = NFA(node=node.right)
 
         # merge final states of left node
         to_merge = []
@@ -316,7 +317,7 @@ class FSA:
             # make final states mergeable
             for state in left.final_states:
                 if state.has_outgoing():
-                    new_state = State()
+                    new_state = NFA_State()
                     state.add_transition(LAMBDA_CHAR, new_state)
                     state = new_state
                 to_merge.append(state)
@@ -332,9 +333,9 @@ class FSA:
 
     def eval_star_node(self, node):
         """Create FSA from regex star node"""
-        child = FSA(node=node.child)
+        child = NFA(node=node.child)
         if child.init_state.has_incoming():
-            self.init_state = State()
+            self.init_state = NFA_State()
             self.init_state.add_transition(LAMBDA_CHAR, child.init_state)
         else:
             self.init_state = child.init_state
@@ -347,12 +348,12 @@ class FSA:
 
     def eval_leaf_node(self, char=None):
         """Create FSA from character, lambda, or null node"""
-        init = State()
+        init = NFA_State()
         self.init_state = init
         if char == LAMBDA_CHAR:
             final = init
         else:
-            final = State()
+            final = NFA_State()
             if char != NULL_CHAR:
                 init.add_transition(char, final)
         self.final_states.add(final)
@@ -381,11 +382,11 @@ class FSA:
         """Add states so that init has no incoming transition and
         there is a single final state with no outgoing transition. 
         new states are connected only to the GTG graph."""
-        self.GTG_init = State("New_Init")
+        self.GTG_init = NFA_State("New_Init")
         self.GTG_init.GTG_out.add((LAMBDA_NODE, self.init_state))
         self.init_state.GTG_in.add((LAMBDA_NODE, self.GTG_init))
 
-        self.GTG_final = State("New_Final")
+        self.GTG_final = NFA_State("New_Final")
         for fstate in self.final_states:
             fstate.GTG_out.add((LAMBDA_NODE, self.GTG_final))
             self.GTG_final.GTG_in.add((LAMBDA_NODE, fstate))
@@ -480,15 +481,39 @@ class FSA:
         alph =  reduce(set.union, [set(s.outgoing.keys()) for s in states], set())
         return alph - {LAMBDA_CHAR}
     
-    def to_dfa(self):
-        """Make a dfa equivalent to self"""
-        dfa = FSA()
-        alphabet = self.get_alphabet()
+    
+    # def check_if_dfa(self):
+    #     """Test if fsa is a dfa"""
+    #     states = self.get_state_list()
+    #     alph = self.get_alphabet()
+    #     for state in states:
+    #         chars = state.outgoing.keys()
+    #         if alph - chars:
+    #             # no transition defined for some alphabet symbol
+    #             return False
+    #         if LAMBDA_CHAR in chars:
+    #             # state has lambda transition
+    #             return False
+    #     return True
+    
+    
+    
+class DFA(FSA):
+    def __init__(self, nfa=None, transition_graph=None):
+        self.init_state = None
+        self.final_states = set()
+        if nfa:
+            self.convert_from_NFA(nfa)
+
+    def convert_from_NFA(self, nfa):
+        """Construct dfa from nfa"""
+
+        alphabet = nfa.get_alphabet()
         complete = {}
         pending = {}
-        init_states = self.init_state.find_all_reachable(LAMBDA_CHAR)
-        dfa.init_state = State(str(init_states))
-        pending[frozenset(init_states)] = dfa.init_state
+        init_states = nfa.init_state.find_all_reachable(LAMBDA_CHAR)
+        self.init_state = DFA_State(str(init_states))
+        pending[frozenset(init_states)] = self.init_state
         while pending:
             label, state = pending.popitem()
             for char in alphabet:
@@ -507,53 +532,57 @@ class FSA:
                     new_label = '{}'
                     if reachable_states:
                         new_label = str(set(reachable_states))
-                    new_state = State(new_label)
+                    new_state = DFA_State(new_label)
                     pending[reachable_states] = new_state
                     state.add_transition(char, new_state)
             complete[label] = state
         
-        dfa.final_states = {state for nfa_states, state in complete.items()
-                             if nfa_states.intersection(self.final_states)}
+        self.final_states = {state for nfa_states, state in complete.items()
+                             if nfa_states.intersection(nfa.final_states)}
+        
+    def test(self, s, trace=False):
+        def print_trace(state, char, rem_str):
+            print(f"{state.label:<13}{char:15}{rem_str}")
 
-        dfa.is_dfa = True
-        return dfa
-    
-    def check_if_dfa(self):
-        """Test if fsa is a dfa"""
-        states = self.get_state_list()
-        alph = self.get_alphabet()
-        for state in states:
-            chars = state.outgoing.keys()
-            if alph - chars:
-                # no transition defined for some alphabet symbol
-                return False
-            if LAMBDA_CHAR in chars:
-                # state has lambda transition
-                return False
-        return True
+        if trace:
+            print("State         Character      Remaining String")
+            print("-" * 50)
+            print_trace(self.init_state, "(start)", s)
+
+        state = self.init_state
+        for i, char in enumerate(s, 1):
+            state = state.transitions[char]
+            if trace:
+                print_trace(state, char, s[i:])
+        accepted = state in self.final_states
+        if trace:
+            if accepted:
+                print(f"{s} accepted")
+            else:
+                print(f"{s} rejected")
+        return accepted
     
     def reduce(self):
-        """Minimize number of states in a DFA"""
-        if not self.is_dfa:
-            return
+        """Minimize number of states"""
         
-        new_dfa = FSA()
-        alphabet = self.get_alphabet()
+        new_dfa = DFA()
+        alphabet = self.init_state.transitions.keys()
         states = self.get_state_list()
 
-        nonfinal_states = set(states) - self.final_states
+        final_states = self.final_states.copy()
+        nonfinal_states = set(states) - final_states
         state_eq_classes = {s: nonfinal_states for s in nonfinal_states}
-        for s in self.final_states:
-            state_eq_classes[s] = self.final_states
+        for s in final_states:
+            state_eq_classes[s] = final_states
 
-        equiv_classes = [self.final_states, nonfinal_states]
+        equiv_classes = [final_states, nonfinal_states]
         marked_new_pair = True
 
         def distinguishable(s1, s2):
             """test if states are distinguishable, given current partitions"""
             for char in alphabet:
-                s1_next = next(iter(s1.outgoing[char]))
-                s2_next = next(iter(s2.outgoing[char]))
+                s1_next = s1.transitions[char]
+                s2_next = s2.transitions[char]
                 if state_eq_classes[s1_next] != state_eq_classes[s2_next]:
                     return True
             return False
@@ -591,8 +620,7 @@ class FSA:
         new_states_dict = {}
         for eq_set in equiv_classes:
             label = "".join([s.label for s in eq_set])
-            new_states_dict[frozenset(eq_set)] = State(label=label)
-        print(new_states_dict)
+            new_states_dict[frozenset(eq_set)] = DFA_State(label=label)
 
         # create the initial state
         new_init_state_set = frozenset(state_eq_classes[self.init_state])
@@ -604,36 +632,63 @@ class FSA:
             if eq_set.intersection(self.final_states):
                 new_dfa.final_states.add(new_state)
 
-            # create transitions
+            # pick an arbitrary member of the equivalence class
             old_state = next(iter(eq_set))
             for char in alphabet:
-                old_next = next(iter(old_state.outgoing[char]))
+                old_next = old_state.transitions[char]
                 next_state_set = frozenset(state_eq_classes[old_next])
                 new_state.add_transition(char, new_states_dict[next_state_set])
 
-        new_dfa.is_dfa = True
         return new_dfa
+    
+    def get_state_list(self):
+        """Get list of reachable states in DFS traversal order."""
+        state_list = []
+        to_visit = [self.init_state]
+        visited = set()
+
+        while len(to_visit) > 0:
+            state = to_visit.pop()
+            if state not in visited:
+                visited.add(state)
+                for next_state in state.transitions.values():
+                    to_visit.append(next_state)
+                state_list.append(state)
+        return state_list
+
+    def __repr__(self):
+        s = f"if {'Label':15}{'Transitions'}\n{"-"*70}\n"
+        for state in self.get_state_list():
+            state_type = START_CHAR if state == self.init_state else "-"
+            state_type += FINAL_CHAR if state in self.final_states else "-"
+            s += f"{state_type} {repr(state):15}{state}\n"
+        
+        return s 
 
 if __name__ == "__main__":
-    # a = FSA(regex="~")
-    a = FSA(filename='mark_test')
-    print(a)
-    r = a.reduce()
-    print(r)
+    # nfa = NFA(filename='reduce_test')
+    # dfa = DFA(nfa=nfa)
+    # print(dfa)
+    # dfa = dfa.reduce()
+    # print(dfa)
+    # print(dfa.test("100001", True))
     # print(a.init_state.find_all_reachable('a'))
-    # a = FSA(filename="a")
+    # a = NFA(filename="a")
     # print(a.to_regex())
     # print(a.to_regex())
     # print(a.test('a', trace=True))
     # print(a.test('abc', trace=True))
-    # a = FSA(regex="a|(ad)")
-    # print(a)
+    a = NFA(regex="a|(ad)|ab")
+    print(a)
+    d = DFA(nfa = a)
+    print(d)
+    print(d.reduce())
     # print(a.test("aaaeaaae", trace=True))
-    # a = FSA(filename="a")
+    # a = NFA(filename="a")
     # print(a)
     # print(a.test("bba", False))
     # print(a.to_regex())
-    # a = FSA(jflap="testing/lambda_cycles.jff")
+    # a = NFA(jflap="testing/lambda_cycles.jff")
     # print(a)
     # a.write_file()
 
