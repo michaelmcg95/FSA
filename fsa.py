@@ -10,7 +10,7 @@ START_CHAR = "!"
 FINAL_CHAR = "*"
 
 class State:
-    def __init__(self, label=None):
+    def __init__(self, label=""):
         self.label = label
         self.outgoing = defaultdict(set)
         self.incoming = defaultdict(set)
@@ -58,7 +58,7 @@ class State:
         """Get all states reachable by consuming char"""
         if visited is None:
             visited = set()
-        # base case: state already visited
+        # prevent infinite recursion on lambda cycles
         if self in visited:
             return set()
         
@@ -69,7 +69,7 @@ class State:
         # try transitions on char
         if char != LAMBDA_CHAR:
             for next_state in self.outgoing[char]:
-                states |= next_state.find_all_reachable(LAMBDA_CHAR, visited)
+                states |= next_state.find_all_reachable(LAMBDA_CHAR)
 
         # try lambda-transitions
         visited.add(self)
@@ -112,12 +112,16 @@ class State:
             for state in state_set:
                 func(char, state)
 
-    def trans_str(self, dir='out'):
+    def trans_str(self, in_dfa, dir='out'):
         """Convert transitions to string"""
         transition_dict = self.outgoing if dir=='out' else self.incoming
         s = ""
         for char, states in transition_dict.items():
-            s += f"{char}: [{', '.join([s.label for s in states])}], "
+            s += f"{char}: "
+            next_states = ', '.join([s.label for s in states])
+            if not in_dfa:
+                next_states = f"[{next_states}]"
+            s += next_states + ", "
         return s[:-2]
 
     # I think I can delete this now
@@ -139,6 +143,8 @@ class FSA:
     def __init__(self, regex=None, node=None, filename=None, jflap=None):
         self.init_state = None
         self.final_states = set()
+        self.is_dfa = False
+
         if regex is not None:
             self.eval_node(parse(regex))
             self.label_states()
@@ -152,6 +158,9 @@ class FSA:
 
         elif jflap is not None:
             self.load_jflap(jflap)
+
+        if self.init_state:
+            self.is_dfa = self.check_if_dfa()
     
     def load_jflap(self, filename):
         """load from jflap xml file"""
@@ -219,13 +228,12 @@ class FSA:
             state.label = str(count)
 
     def __repr__(self):
-        s = f"if {'Label':11}{'Outgoing Transitions':25}Incoming Transitions\n"
-        s += ("-"*70 + "\n")
+        s = f"if {'Label':15}{'Outgoing Transitions'}\n{"-"*70}\n"
         for state in self.get_state_list():
             state_type = START_CHAR if state == self.init_state else "-"
             state_type += FINAL_CHAR if state in self.final_states else "-"
-            s += f"{state_type} {repr(state):10}"
-            s += f"{state.trans_str("out"):25} {state.trans_str("in")}\n"
+            s += f"{state_type} {repr(state):15}"
+            s += f"{state.trans_str(self.is_dfa, "out")}\n"
         
         return s 
     
@@ -483,43 +491,119 @@ class FSA:
         pending[frozenset(init_states)] = dfa.init_state
         while pending:
             label, state = pending.popitem()
-            print("now processing", state.label)
             for char in alphabet:
-                print("char: ", char)
                 reachable_states = set()
                 for nfa_state in label:
-                    print("nfa state: ", nfa_state)
                     reachable_states |= nfa_state.find_all_reachable(char)
-                print(char, "can reach", reachable_states)
                 # freeze reachable_states to make it hashable
                 reachable_states = frozenset(reachable_states)
                 if label == reachable_states:
                     state.add_transition(char, state)
                 elif reachable_states in complete:
-                    print("state already exists and is complete: adding transition")
                     state.add_transition(char, complete[reachable_states])
                 elif reachable_states in pending:
-                    print("state exists in pending: adding transition")
                     state.add_transition(char, pending[reachable_states])
                 else:
-                    print("creating new state: ", reachable_states)
                     new_label = '{}'
                     if reachable_states:
                         new_label = str(set(reachable_states))
                     new_state = State(new_label)
-                    pending[frozenset(reachable_states)] = new_state
+                    pending[reachable_states] = new_state
                     state.add_transition(char, new_state)
             complete[label] = state
-            
+        
+        dfa.final_states = {state for nfa_states, state in complete.items()
+                             if nfa_states.intersection(self.final_states)}
 
+        dfa.is_dfa = True
         return dfa
+    
+    def check_if_dfa(self):
+        """Test if fsa is a dfa"""
+        states = self.get_state_list()
+        alph = self.get_alphabet()
+        for state in states:
+            chars = state.outgoing.keys()
+            if alph - chars:
+                # no transition defined for some alphabet symbol
+                return False
+            if LAMBDA_CHAR in chars:
+                # state has lambda transition
+                return False
+        return True
+    
+    def reduce(self):
+        """Minimize number of states in a DFA"""
+        if not self.is_dfa:
+            return
+        
+        new_dfa = FSA()
+        alph = self.get_alphabet()
+        states = self.get_state_list()
+        equiv_classes = {}
+
+
+        # partition final and nonfinal states
+        for s in states:
+            equiv_classes[s] = 0 if s in self.final_states else 1
+        next_class_num = 2
+
+        # put distinguishable states in different equivalence classes
+        marked_new_pair = True
+        while marked_new_pair:
+            begin_class_num = next_class_num
+            for (ind, s1) in enumerate(states, 1):
+                for s2 in states[ind:]:
+                    if equiv_classes[s1] == equiv_classes[s2]:
+                        for char in alph:
+                            s1_next = list(s1.outgoing[char])[0]
+                            s2_next = list(s2.outgoing[char])[0]
+                            if equiv_classes[s1_next] != equiv_classes[s2_next]:
+                                equiv_classes[s1] = next_class_num
+                                next_class_num += 1
+                                # do not need to look at more transitions
+                                break
+            marked_new_pair = next_class_num != begin_class_num
+
+        eq_state_sets = [set() for _ in range(next_class_num)]
+        for state, class_index in equiv_classes.items():
+            eq_state_sets[class_index].add(state)
+
+        # create new state for each equivalence class
+        new_states_dict = {}
+        for eq_set in eq_state_sets:
+            label = "".join([s.label for s in eq_set])
+            new_states_dict[frozenset(eq_set)] = State(label=label)
+
+        # new_states_dict = {frozenset(s): State() for s in eq_state_sets}
+
+        new_init_ind = equiv_classes[self.init_state]
+        new_init_state_set = frozenset(eq_state_sets[new_init_ind])
+        new_dfa.init_state= new_states_dict[new_init_state_set]
+
+        # create transitions between new states
+        for eq_set, new_state in new_states_dict.items():
+            if eq_set.intersection(self.final_states):
+                new_dfa.final_states.add(new_state)
+
+            old_state = list(eq_set)[0]
+            for char in alph:
+                old_next = list(old_state.outgoing[char])[0]
+                next_ind = equiv_classes[old_next]
+                next_state_set = frozenset(eq_state_sets[next_ind])
+                new_state.add_transition(char, new_states_dict[next_state_set])
+
+        # new_dfa.label_states()
+        new_dfa.is_dfa = True
+        return new_dfa
 
 
 if __name__ == "__main__":
     # a = FSA(regex="~")
-    a = FSA(filename='dfa_test2')
-    dfa = a.to_dfa()
-    print(dfa)
+    a = FSA(filename='mark_test')
+    print(a)
+    r = a.reduce()
+    print(r)
     # print(a.init_state.find_all_reachable('a'))
     # a = FSA(filename="a")
     # print(a.to_regex())
