@@ -538,65 +538,81 @@ class FSA:
             return
         
         new_dfa = FSA()
-        alph = self.get_alphabet()
+        alphabet = self.get_alphabet()
         states = self.get_state_list()
-        equiv_classes = {}
 
+        nonfinal_states = set(states) - self.final_states
+        state_eq_classes = {s: nonfinal_states for s in nonfinal_states}
+        for s in self.final_states:
+            state_eq_classes[s] = self.final_states
 
-        # partition final and nonfinal states
-        for s in states:
-            equiv_classes[s] = 0 if s in self.final_states else 1
-        next_class_num = 2
-
-        # put distinguishable states in different equivalence classes
+        equiv_classes = [self.final_states, nonfinal_states]
         marked_new_pair = True
-        while marked_new_pair:
-            begin_class_num = next_class_num
-            for (ind, s1) in enumerate(states, 1):
-                for s2 in states[ind:]:
-                    if equiv_classes[s1] == equiv_classes[s2]:
-                        for char in alph:
-                            s1_next = list(s1.outgoing[char])[0]
-                            s2_next = list(s2.outgoing[char])[0]
-                            if equiv_classes[s1_next] != equiv_classes[s2_next]:
-                                equiv_classes[s1] = next_class_num
-                                next_class_num += 1
-                                # do not need to look at more transitions
-                                break
-            marked_new_pair = next_class_num != begin_class_num
 
-        eq_state_sets = [set() for _ in range(next_class_num)]
-        for state, class_index in equiv_classes.items():
-            eq_state_sets[class_index].add(state)
+        def distinguishable(s1, s2):
+            """test if states are distinguishable, given current partitions"""
+            for char in alphabet:
+                s1_next = next(iter(s1.outgoing[char]))
+                s2_next = next(iter(s2.outgoing[char]))
+                if state_eq_classes[s1_next] != state_eq_classes[s2_next]:
+                    return True
+            return False
+
+        # continue until no new partitions are created
+        while marked_new_pair:
+            new_equiv_classes = []
+            for eq_class in equiv_classes:
+                if len(eq_class) == 1:
+                    continue
+
+                eq_class_iter = iter(eq_class)
+                # select partition element
+                partition_elem = next(eq_class_iter)
+                distingiushed_states = set()
+
+                # find distinguishable elements
+                for elem in eq_class_iter:
+                    if distinguishable(elem, partition_elem):
+                        distingiushed_states.add(elem)    
+
+                # move distinguishable elements to new set
+                if distingiushed_states:
+                    eq_class -= distingiushed_states
+                    new_equiv_classes.append(distingiushed_states)
+                    for s in distingiushed_states:
+                        state_eq_classes[s] = distingiushed_states
+
+            if new_equiv_classes:
+                equiv_classes += new_equiv_classes
+            else:
+                marked_new_pair = False
 
         # create new state for each equivalence class
         new_states_dict = {}
-        for eq_set in eq_state_sets:
+        for eq_set in equiv_classes:
             label = "".join([s.label for s in eq_set])
             new_states_dict[frozenset(eq_set)] = State(label=label)
+        print(new_states_dict)
 
-        # new_states_dict = {frozenset(s): State() for s in eq_state_sets}
+        # create the initial state
+        new_init_state_set = frozenset(state_eq_classes[self.init_state])
+        new_dfa.init_state = new_states_dict[new_init_state_set]
 
-        new_init_ind = equiv_classes[self.init_state]
-        new_init_state_set = frozenset(eq_state_sets[new_init_ind])
-        new_dfa.init_state= new_states_dict[new_init_state_set]
-
-        # create transitions between new states
+        # set up the transition graph
         for eq_set, new_state in new_states_dict.items():
+            # check for final states
             if eq_set.intersection(self.final_states):
                 new_dfa.final_states.add(new_state)
 
-            old_state = list(eq_set)[0]
-            for char in alph:
-                old_next = list(old_state.outgoing[char])[0]
-                next_ind = equiv_classes[old_next]
-                next_state_set = frozenset(eq_state_sets[next_ind])
+            # create transitions
+            old_state = next(iter(eq_set))
+            for char in alphabet:
+                old_next = next(iter(old_state.outgoing[char]))
+                next_state_set = frozenset(state_eq_classes[old_next])
                 new_state.add_transition(char, new_states_dict[next_state_set])
 
-        # new_dfa.label_states()
         new_dfa.is_dfa = True
         return new_dfa
-
 
 if __name__ == "__main__":
     # a = FSA(regex="~")
