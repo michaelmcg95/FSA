@@ -9,6 +9,90 @@ COMMENT_CHAR = "#"
 START_CHAR = "!"
 FINAL_CHAR = "*"
 
+class FSA_Error(Exception):
+    pass
+
+class Transition_Graph:
+    """Read FSA data file and construct transition graph"""
+    def __init__(self, filename=None, jflap=None):
+        self.init_state_label = None
+        self.final_state_labels = set()
+        self.state_dict = {}
+        self.transition_chars = set()
+
+        if filename:
+            self.load_file(filename)
+        elif jflap:
+            self.load_jflap(jflap)
+
+        if self.init_state_label is None:
+            raise FSA_Error("No initial state")
+        if len(self.final_state_labels) == 0:
+            raise FSA_Error("No final state")
+
+        self.is_dfa = self.check_if_dfa()
+
+    def get_state_dict(self):
+        return self.state_dict
+    
+    def load_file(self, filename):
+        with open(filename, "r") as file:
+            lines = file.readlines()
+
+        lines_words = [l.split() for l in lines if l[0] != COMMENT_CHAR]
+        lines_words = [words for words in lines_words if len(words) > 0]
+
+        current_state_label = None
+        for words in lines_words:
+            first_char = words[0][0]
+            if first_char == LABEL_CHAR:
+                current_state_label = words[0][1:]
+                if current_state_label == "":
+                    raise SyntaxError("Missing state label")
+                self.state_dict[current_state_label] = defaultdict(list)
+            elif first_char == START_CHAR:
+                if self.init_state_label is not None:
+                    raise SyntaxError("Multiple initial states")
+                self.init_state_label = current_state_label
+            elif first_char == FINAL_CHAR:
+                self.final_state_labels.add(current_state_label)
+            else:
+                self.state_dict[current_state_label][first_char] += words[1:]
+                self.transition_chars.add(first_char)
+  
+    def load_jflap(self, filename):
+        """load from jflap xml file"""
+        tree = ET.parse(filename)
+        automaton = tree.find("automaton")
+        for elem in automaton:
+            if elem.tag == "state":
+                label = elem.attrib["id"]
+                self.state_dict[label] = defaultdict(list)
+                if elem.find("initial") is not None:
+                    self.init_state_label = label
+                if elem.find("final") is not None:
+                    self.final_state_labels.add(label)
+            elif elem.tag == "transition":
+                char = elem.find("read").text
+                if char is None:
+                    char = LAMBDA_CHAR
+                from_label = elem.find("from").text
+                to_label = elem.find("to").text
+                if from_label not in self.state_dict:
+                    self.state_dict[from_label] = defaultdict(list)
+                    self.transition_chars.add(char)
+                self.state_dict[from_label][char].append(to_label)
+         
+        
+    def check_if_dfa(self):
+        if LAMBDA_CHAR in self.transition_chars:
+            return False
+        for transitions in self.state_dict.values():
+            if self.transition_chars - set(transitions.keys()):
+                return False
+        return True
+
+
 class State:
     def __init__(self, label=""):
         self.label = label
@@ -16,7 +100,6 @@ class State:
     def __repr__(self):
         return self.label
     
-
 class NFA_State(State):
     def __init__(self, *args, **kwargs):
         self.outgoing = defaultdict(set)
@@ -152,10 +235,18 @@ class FSA:
         return s 
 
 class NFA(FSA):
-    def __init__(self, regex=None, node=None, filename=None, jflap=None):
+    def __init__(self, regex=None, node=None, filename=None, jflap=None, tg=None):
         self.init_state = None
         self.final_states = set()
-        self.is_dfa = False
+
+        if jflap is not None:
+            tg = Transition_Graph(jflap=jflap)
+
+        if filename is not None:
+            tg = Transition_Graph(filename=filename)
+
+        if tg is not None:
+            self.load_from_transition_graph(tg)
 
         if regex is not None:
             self.eval_node(parse(regex))
@@ -164,80 +255,26 @@ class NFA(FSA):
         elif node is not None:
             self.eval_node(node)
             self.label_states()
-
-        elif filename is not None:
-            self.load_file(filename)
-
-        elif jflap is not None:
-            self.load_jflap(jflap)
     
-    def load_jflap(self, filename):
-        """load from jflap xml file"""
-        tree = ET.parse(filename)
-        automaton = tree.find("automaton")
-        states = {}
-        for elem in automaton:
-            if elem.tag == "state":
-                label = elem.attrib["name"]
-                new_state = NFA_State(label)
-                states[elem.attrib["id"]]= new_state
-                if elem.find("initial") is not None:
-                    self.init_state = new_state
-                if elem.find("final") is not None:
-                    self.final_states.add(new_state)
-            elif elem.tag == "transition":
-                from_state = states[elem.find("from").text]
-                to_state = states[elem.find("to").text]
-                char = elem.find("read").text
-                if char is None:
-                    char = LAMBDA_CHAR
-                from_state.add_transition(char, to_state)
-                
-    def load_file(self, filename):
-        with open(filename, "r") as file:
-            lines = file.readlines()
-
-        lines_words = [l.split() for l in lines if l[0] != COMMENT_CHAR]
-        lines_words = [words for words in lines_words if len(words) > 0]
-
-        state_label_dict = {}
-        transitions = defaultdict(list)
-
-        current_state = None
-        for words in lines_words:
-            first_char = words[0][0]
-            if first_char == LABEL_CHAR:
-                if len(words[0]) < 2:
-                    raise SyntaxError("Missing state label")
-                label = words[0][1:]
-                current_state = NFA_State(label=label)
-                state_label_dict[label] = current_state
-            elif first_char == START_CHAR:
-                if self.init_state is not None:
-                    raise SyntaxError("Multiple initial states")
-                self.init_state = current_state
-            elif first_char == FINAL_CHAR:
-                self.final_states.add(current_state)
-            else:
-                for word in words[1:]:
-                    transitions[current_state.label].append((first_char, word))
-        if self.init_state is None:
-            raise SyntaxError("No initial state")
-        if len(self.final_states) == 0:
-            raise SyntaxError("No final state")
-        
-        for src_label, trans in transitions.items():
-            for c, dest_label in trans:
-                state = state_label_dict[src_label]
-                dest_state = state_label_dict[dest_label]
-                state.add_transition(c, dest_state)
+    def load_from_transition_graph(self, transition_graph):
+        """Construct nfa from transition graph"""
+        transition_dict = transition_graph.get_state_dict()
+        state_dict = {label: NFA_State(label) 
+                      for label in transition_dict.keys()}
+        for label, transitions in transition_dict.items():
+            state = state_dict[label]
+            if label == transition_graph.init_state_label:
+                self.init_state = state
+            if label in transition_graph.final_state_labels:
+                self.final_states.add(state)
+            for char, labels in transitions.items():
+                for dest_label in labels:
+                    state.add_transition(char, state_dict[dest_label])
 
     def label_states(self):
         for count, state in enumerate(self.get_state_list()):
             state.label = str(count)
 
-
-    
     def write_file(self, filename="tg"):
         """Write transition graph to file"""
         states = self.get_state_list()
@@ -251,7 +288,45 @@ class NFA(FSA):
                 for char, state_list in state.outgoing.items():
                     dest_states = " ".join([s.label for s in state_list])
                     file.write(f"{char}: {dest_states}\n")
-                file.write("\n");
+                file.write("\n")
+
+    def write_jflap(self):
+        x = 100
+        y = 150
+        states = self.get_state_list()
+        tree = ET.ElementTree(ET.Element("structure"))
+        id_dict = {s: str(i) for i, s in enumerate(states)}
+        root = tree.getroot()
+        ET.SubElement(root, "type").text = "fa"
+        automaton = ET.SubElement(root, "automaton")
+        for state, id in id_dict.items():
+            attrib = {"id": id, "name": state.label}
+            state_elem = ET.SubElement(automaton, "state", attrib=attrib)
+            ET.SubElement(state_elem, "x").text = str(x)
+            ET.SubElement(state_elem, "y").text = str(y)
+            if state in self.final_states:
+                ET.SubElement(state_elem, "final")
+            if state == self.init_state:
+                ET.SubElement(state_elem, "initial")
+            x += 70
+
+        for state in states:
+            for char, dest_states in state.outgoing.items():
+                if char == LAMBDA_CHAR:
+                    char = ""
+                for dest in dest_states:
+                    trans = ET.SubElement(automaton, "transition")
+                    ET.SubElement(trans, "from").text = id_dict[state]
+                    ET.SubElement(trans, "to").text = id_dict[dest]
+                    ET.SubElement(trans, "read").text = char
+                    
+
+        # print(ET.tostringlist(root, encoding='unicode'))
+        ET.indent(root)
+
+        with open("xmltest", "w") as file:
+            tree.write(file, encoding="unicode", xml_declaration=True)
+
 
     def get_state_list(self):
         """Get list of reachable states in DFS traversal order."""
@@ -479,35 +554,33 @@ class NFA(FSA):
         """Get set of characters consumed in transitions"""
         states = self.get_state_list()
         alph =  reduce(set.union, [set(s.outgoing.keys()) for s in states], set())
-        return alph - {LAMBDA_CHAR}
-    
-    
-    # def check_if_dfa(self):
-    #     """Test if fsa is a dfa"""
-    #     states = self.get_state_list()
-    #     alph = self.get_alphabet()
-    #     for state in states:
-    #         chars = state.outgoing.keys()
-    #         if alph - chars:
-    #             # no transition defined for some alphabet symbol
-    #             return False
-    #         if LAMBDA_CHAR in chars:
-    #             # state has lambda transition
-    #             return False
-    #     return True
-    
-    
+        return alph - {LAMBDA_CHAR}    
     
 class DFA(FSA):
     def __init__(self, nfa=None, transition_graph=None):
         self.init_state = None
         self.final_states = set()
+        if transition_graph:
+            self.load_from_transition_graph(transition_graph)
         if nfa:
             self.convert_from_NFA(nfa)
 
+    def load_from_transition_graph(self, transition_graph):
+        """Construct dfa from transition graph"""
+        transition_dict = transition_graph.get_state_dict()
+        state_dict = {label: DFA_State(label) 
+                      for label in transition_dict.keys()}
+        for label, transitions in transition_dict.items():
+            state = state_dict[label]
+            if label == transition_graph.init_state_label:
+                self.init_state = state
+            if label in transition_graph.final_state_labels:
+                self.final_states.add(state)
+            for char, labels in transitions.items():
+                state.add_transition(char, state_dict[labels[0]])
+
     def convert_from_NFA(self, nfa):
         """Construct dfa from nfa"""
-
         alphabet = nfa.get_alphabet()
         complete = {}
         pending = {}
@@ -541,6 +614,7 @@ class DFA(FSA):
                              if nfa_states.intersection(nfa.final_states)}
         
     def test(self, s, trace=False):
+        """Test if DFA accepts a string"""
         def print_trace(state, char, rem_str):
             print(f"{state.label:<13}{char:15}{rem_str}")
 
@@ -666,6 +740,9 @@ class DFA(FSA):
         return s 
 
 if __name__ == "__main__":
+    # tg = Transition_Graph(jflap="testing/fsa_cases/choices.jff")
+    # n = NFA(transition_graph=tg)
+    # print(n)
     # nfa = NFA(filename='reduce_test')
     # dfa = DFA(nfa=nfa)
     # print(dfa)
@@ -673,23 +750,21 @@ if __name__ == "__main__":
     # print(dfa)
     # print(dfa.test("100001", True))
     # print(a.init_state.find_all_reachable('a'))
-    # a = NFA(filename="a")
+    a = NFA(filename="a")
     # print(a.to_regex())
     # print(a.to_regex())
     # print(a.test('a', trace=True))
     # print(a.test('abc', trace=True))
-    a = NFA(regex="a|(ad)|ab")
-    print(a)
-    d = DFA(nfa = a)
-    print(d)
-    print(d.reduce())
+    # a = NFA(regex="a|(ad)|ab")
+    # print(a)
+    # d = DFA(nfa = a)
+    # print(d)
+    # print(d.reduce())
     # print(a.test("aaaeaaae", trace=True))
     # a = NFA(filename="a")
     # print(a)
     # print(a.test("bba", False))
     # print(a.to_regex())
-    # a = NFA(jflap="testing/lambda_cycles.jff")
-    # print(a)
+    # a = NFA(jflap="testing/fsa_cases/lambda_cycles.jff")
+    a.write_jflap()
     # a.write_file()
-
-
