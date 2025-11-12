@@ -6,8 +6,8 @@
 # User Interface for FSA simulator
 # Due October 10, 2025
 
-# from fsa import FSA
-# using dummy FSA for now
+from fsa import *
+import readline
 
 PROMPT = "> "
 ACCEPT_REJECT = {True: "accept", False: "reject"}
@@ -27,17 +27,6 @@ trace: toggle tracing. When activated, display a list of states visited
 print: print a text description of the FSA's transition graph.
 regex: generate an equivalent regex from FSA.
 '''
-
-class FSA:
-    """Stub FSA that accepts all strings"""
-    def __init__(self, *args, **kwargs):
-        pass
-    def test(self, *args, **kwargs):
-        return True
-    def __str__(self):
-        return "Stub FSA for UI prototype"
-    def to_regex(self):
-        return "Coming soon."
     
 if __name__ == "__main__":
     print("Welcome to FSA simulator. Type 'help' for instructions.")
@@ -62,34 +51,78 @@ if __name__ == "__main__":
             else:
                 print("tracing on")
             trace = not trace
+        elif command == "import":
+            if len(words) < 2:
+                print("Error: no filename given. Usage: 'import <filename>'")
+            else:
+                try:
+                    my_fsa = NFA(jflap=words[1])
+                    print("Imported jflap xml file")
+                except Exception as e:
+                    print(e)
+        elif command == "load":
+            if len(words) < 3:
+                print("Error: missing argument. Load requires 2 arguments")
+            try:
+                if words[1] == "file":
+                    my_fsa = NFA(filename=words[2])
+                    print("file loaded")
+                elif words[1] == "regex":
+                    my_fsa = NFA(regex=words[2])
+                    print("regex loaded")           
+                else:
+                    print("Error: unrecognized option. Use 'file' or 'regex'.")
+            except (FSA_Error, SyntaxError) as e:
+                print("Error in FSA file:", e)
+            except Exception as e:
+                print(e)
+
+        # Commands after this point require a FSA to be loaded
+        elif my_fsa is None:
+            print("Error: no FSA loaded")
         elif command == "print":
             print(my_fsa)
         elif command == "test":
             if len(words) < 2:
                 print("Error: no string given. Usage: 'test <string>'")
-            elif my_fsa is None:
-                print("Error: no FSA loaded")
             else:
                 result = my_fsa.test(words[1], trace)
                 print(ACCEPT_REJECT[result])
-        elif command == "load":
-            try:
-                if len(words) < 3:
-                    print("Error: missing argument. Load requires 2 arguments")
-                elif words[1] == "file":
-                    my_fsa = FSA(filename=words[2])
-                    print("file loaded")
-                elif words[1] == "regex":
-                    my_fsa = FSA(regex=words[2])
-                    print("regex loaded")           
-                else:
-                    print("Error: unrecognized option. Use 'file' or 'regex'.")
-            except SyntaxError as e:
-                print(f"Error: {e}")
         elif command == "regex":
-            if my_fsa is None:
+            print(my_fsa.to_regex())
+        elif command == "write":
+            if len(words) < 2:
+                print("Error: no filename given. Usage: 'write <filename>'")
+            elif my_fsa is None:
                 print("Error: no FSA loaded")
             else:
-                print(my_fsa.to_regex())
+                my_fsa.write_file(words[1])
+                print("Wrote transition graph to", words[1])
+        elif command == "reduce":
+            if isinstance(my_fsa, DFA):
+                num_state_before = len(my_fsa.get_state_list())
+                DFA_reduced = my_fsa.reduce()
+                num_state_after = len(DFA_reduced.get_state_list())
+                reduction = num_state_before - num_state_after
+                if reduction == 0:
+                    print("DFA is already minimal")
+                else:
+                    my_fsa = DFA_reduced
+                    print(f"Reduced number of states by {reduction}.")
+            else:
+                print("Error: automaton is not a DFA. Use command <dfa> first.")
+        elif command == "dfa":
+            if isinstance(my_fsa, DFA):
+                print("Your automaton is already a DFA")
+            else:
+                my_fsa = DFA(nfa=my_fsa)
+                print("Converted automaton to a DFA")
+        elif command == "export":
+            if len(words) < 2:
+                print("Error: no filename given. Usage: 'export <filename>'")
+            else:
+                my_fsa.write_jflap(words[1])
+                print("Wrote JFLAP xml to", words[1])
+
         else:
             print(f"Unrecognized command: {command}")
