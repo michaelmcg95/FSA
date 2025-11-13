@@ -90,6 +90,8 @@ if __name__ == "__main__":
                 print(ACCEPT_REJECT[result])
         elif command == "regex":
             print(my_fsa.to_regex())
+        elif command == "label":
+            my_fsa.label_states()
         elif command == "write":
             if len(words) < 2:
                 print("Error: no filename given. Usage: 'write <filename>'")

@@ -232,6 +232,11 @@ class DFA_State(State):
         return {char: [state] for char, state in self.transitions.items()}
 
 class FSA:
+    """Base class for finite state automata"""
+    def label_states(self, start=0):
+        for count, state in enumerate(self.get_state_list(), start):
+            state.label = str(count)
+
     def write_file(self, filename):
         """Write transition graph to file"""
         states = self.get_state_list()
@@ -336,10 +341,6 @@ class NFA(FSA):
             for char, labels in transitions.items():
                 for dest_label in labels:
                     state.add_transition(char, state_dict[dest_label])
-
-    def label_states(self):
-        for count, state in enumerate(self.get_state_list()):
-            state.label = str(count)
 
     def get_state_list(self):
         """Get list of reachable states in DFS traversal order."""
@@ -654,6 +655,10 @@ class DFA(FSA):
             else:
                 print(f"{s} rejected")
         return accepted
+    
+    def to_regex(self):
+        """Get equivalent regex"""
+        return NFA(dfa=self).to_regex()
     
     def reduce(self):
         """Make equivalent DFA with minimal number of states"""

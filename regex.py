@@ -309,11 +309,11 @@ def parse(regex, simple=True):
     return tree
 
 if __name__ == "__main__":
-    print(parse("((a|b)(c|d*|e))*"))
-    print(parse("((a|b)(c|d*|e))*").regex())
-    print(parse("(a*|(b|(e|g*))|c*)***"))
-    print(parse("a*"))
-    print(parse("a|~"))
-    print(parse("ab*c|^|cd*e"))
-    print(parse("(^)*"))
-    print(parse("a~"))
+    # print(parse("((a|b)(c|d*|e))*"))
+    # print(parse("((a|b)(c|d*|e))*").regex())
+    print(parse("ab*|a(b|a)*b"))
+    # print(parse("a*"))
+    # print(parse("a|~"))
+    # print(parse("ab*c|^|cd*e"))
+    # print(parse("(^)*"))
+    # print(parse("a~"))
