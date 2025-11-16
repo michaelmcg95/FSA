@@ -83,11 +83,18 @@ class Transition_Graph:
                 self.state_dict[from_label][char].append(to_label)
          
     def is_dfa(self):
+        """Check if tg satisfies DFA restrictions"""
+        # no lambda transitions
         if LAMBDA_CHAR in self.transition_chars:
             return False
         for transitions in self.state_dict.values():
+            # total transition function
             if self.transition_chars - set(transitions.keys()):
                 return False
+            # one transition for each symbol
+            for  dest_labels in transitions.values():
+                if len(dest_labels) != 1:
+                    return False
         return True
 
 
@@ -207,7 +214,7 @@ class NFA_State(State):
     def __str__(self):
         """Convert outgoing transitions to string"""
         s = ""
-        for char, states in self.outgoing.items():
+        for char, states in sorted(self.outgoing.items()):
             s += f"{char}: [{', '.join([s.label for s in states])}], "
         return s[:-2]
     
@@ -218,7 +225,7 @@ class DFA_State(State):
 
     def __str__(self):
         s = ""
-        for char, state in self.transitions.items():
+        for char, state in sorted(self.transitions.items()):
             s += f"{char}: {repr(state)}, "
         return s[:-2]
     
@@ -283,9 +290,10 @@ class FSA:
         ET.indent(root)
         with open(filename, "w") as file:
             tree.write(file, encoding="unicode", xml_declaration=True)
-    def __repr__(self):
+
+    def __str__(self):
         s = f"if {'Label':15}{'Transitions'}\n{"-"*70}\n"
-        for state in self.get_state_list():
+        for state in sorted(self.get_state_list(), key=lambda s: s.label):
             state_type = START_CHAR if state == self.init_state else "-"
             state_type += FINAL_CHAR if state in self.final_states else "-"
             s += f"{state_type} {repr(state):15}{str(state)}\n"
@@ -809,5 +817,7 @@ class DFA(FSA):
 
 if __name__ == "__main__":
     # nfa = NFA(filename='simult_test')
+    # print(nfa)
     # print(nfa.test_simultaneous("ac", trace=True))
-    a = Transition_Graph(filename="simult_test")
+    a = NFA(filename="is_dfa_test")
+    print(a)

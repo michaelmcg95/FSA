@@ -19,14 +19,21 @@ You can then print its transition graph and test it with strings.
 The following commands are available:
 help: display information on using the program.
 quit: end the program.
-load file [filename]: load a FSA from a state transition file.
+load file [filename]: load a FSA from a state transition graph file.
 load regex [regex]: load a FSA from a regex expression.
 test [options] [string]: check if FSA accepts string. if -b option given
     test using backtracking method
 trace: toggle tracing. When activated, display a list of states visited
     when testing strings.
 print: print a text description of the FSA's transition graph.
+write: save FSA as transition graph file
 regex: generate an equivalent regex from FSA.
+import [filename]: load FSA from jflap xml file
+export: save FSA as jflap xml file
+reduce: minimize number of states in a DFA
+DFA: convert NFA to DFA
+type: check if current automaton is DFA or NFA
+label: relabel the states of FSA
 '''
 
 def make_fsa(tg):
@@ -140,7 +147,7 @@ if __name__ == "__main__":
                 print("Error: automaton is not a DFA. Use command <dfa> first.")
         elif command == "dfa":
             if isinstance(my_fsa, DFA):
-                print("Your automaton is already a DFA")
+                print("Automaton is already a DFA")
             else:
                 my_fsa = DFA(nfa=my_fsa)
                 print("Converted automaton to a DFA")
