@@ -27,8 +27,6 @@ class Transition_Graph:
 
         if self.init_state_label is None:
             raise FSA_Error("No initial state")
-        if len(self.final_state_labels) == 0:
-            raise FSA_Error("No final state")
 
         self.is_dfa = self.check_if_dfa()
 
@@ -494,7 +492,43 @@ class NFA(FSA):
         init_out_nodes = [out_node for out_node, _ in self.GTG_init.GTG_out]
         parse_tree = union_all(init_out_nodes)
         return simplify(parse_tree).regex()
-                    
+
+    def test_simultaneous(self, s, trace=False):
+        """Test if NFA accepts a string using multiple simultaneous paths"""
+
+        def _test(s, current_states):
+            # follow lambda transitions
+            lambda_states = set()
+            for state in current_states:
+                lambda_states |= state.find_all_reachable(LAMBDA_CHAR)
+            current_states |= lambda_states
+
+            if trace:
+                print("Remaining String     States")
+                print("-" * 80)
+                print(f"{s:20} {current_states}", end="\n\n")
+
+            # base case: no path to a final state on s
+            if len(current_states) == 0:
+                return False
+
+            # End of input: check if any states are final
+            if s == "":
+                return any([s in self.final_states for s in current_states])
+            
+            # Not end of input:follow non-lambda transitions
+            new_states = set()
+            for state in current_states:
+                # Find states reachable on next char in string
+                reachable = state.outgoing.get(s[0], [])
+                # for each state, create a new path by extending existing path
+                for next_state in reachable:
+                    new_states.add(next_state)
+            return _test(s[1:], new_states)
+
+        s = "" if s == LAMBDA_CHAR else s
+        return _test(s, {self.init_state})
+
     def test(self, s, trace=False):
         def print_trace(trans, label, str):
             print(f"{label:<13}{trans:15}{str}")
@@ -766,36 +800,5 @@ class DFA(FSA):
         return s 
 
 if __name__ == "__main__":
-    # tg = Transition_Graph(jflap="testing/fsa_cases/choices.jff")
-    # n = NFA(transition_graph=tg)
-    # print(n)
-    # nfa = NFA(filename='reduce_test')
-    # nfa = NFA(regex="ab|ba")
-    # dfa = DFA(nfa=nfa)
-    # print(dfa)
-    # dfa = dfa.reduce()
-    # nfa = NFA(dfa=dfa)
-    # print(nfa)
-    # print(nfa.to_regex())
-    # print(dfa)
-    # print(dfa.test("100001", True))
-    # print(a.init_state.find_all_reachable('a'))
-    a = NFA(jflap="xml_test")
-    print(a)
-    # print(a.to_regex())
-    # print(a.to_regex())
-    # print(a.test('a', trace=True))
-    # print(a.test('abc', trace=True))
-    # a = NFA(regex="a|(ad)|ab")
-    # print(a)
-    # d = DFA(nfa = a)
-    # print(d)
-    # print(d.reduce())
-    # print(a.test("aaaeaaae", trace=True))
-    # a = NFA(filename="a")
-    # a = NFA(filename="testing/fsa_cases/lambda_cycles.fsa")
-    # print(a)
-    # print(a.test("bba"))
-    # print(a.to_regex())
-    # dfa.write_jflap("xml_test2")
-    # a.write_file()
+    nfa = NFA(filename='simult_test')
+    print(nfa.test_simultaneous("ac", trace=True))
