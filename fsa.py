@@ -12,6 +12,9 @@ FINAL_CHAR = "*"
 class FSA_Error(Exception):
     pass
 
+class DFA_Error(Exception):
+    pass
+
 class Transition_Graph:
     """Read FSA data file and construct transition graph"""
     def __init__(self, filename=None, jflap=None):
@@ -27,9 +30,7 @@ class Transition_Graph:
 
         if self.init_state_label is None:
             raise FSA_Error("No initial state")
-
-        self.is_dfa = self.check_if_dfa()
-
+            
     def get_state_dict(self):
         return self.state_dict
     
@@ -81,8 +82,7 @@ class Transition_Graph:
                     self.transition_chars.add(char)
                 self.state_dict[from_label][char].append(to_label)
          
-        
-    def check_if_dfa(self):
+    def is_dfa(self):
         if LAMBDA_CHAR in self.transition_chars:
             return False
         for transitions in self.state_dict.values():
@@ -493,7 +493,7 @@ class NFA(FSA):
         parse_tree = union_all(init_out_nodes)
         return simplify(parse_tree).regex()
 
-    def test_simultaneous(self, s, trace=False):
+    def test(self, s, trace=False):
         """Test if NFA accepts a string using multiple simultaneous paths"""
 
         def _test(s, current_states):
@@ -529,7 +529,8 @@ class NFA(FSA):
         s = "" if s == LAMBDA_CHAR else s
         return _test(s, {self.init_state})
 
-    def test(self, s, trace=False):
+    def test_backtrack(self, s, trace=False):
+        """Test if NFA accepts string using backtracking method"""
         def print_trace(trans, label, str):
             print(f"{label:<13}{trans:15}{str}")
 
@@ -605,12 +606,19 @@ class NFA(FSA):
         return alph - {LAMBDA_CHAR}    
     
 class DFA(FSA):
-    def __init__(self, nfa=None, transition_graph=None):
+    def __init__(self, nfa=None, filename=None, jflap=None, tg=None):
         self.init_state = None
         self.final_states = set()
-        if transition_graph:
-            self.load_from_transition_graph(transition_graph)
-        if nfa:
+
+        if filename:
+            tg = Transition_Graph(filename=filename)
+        elif jflap:
+            tg = Transition_Graph(jflap=jflap)
+        if tg:
+            if not tg.is_dfa():
+                raise DFA_Error
+            self.load_from_transition_graph(tg)
+        elif nfa:
             self.convert_from_NFA(nfa)
 
     def load_from_transition_graph(self, transition_graph):
@@ -800,5 +808,6 @@ class DFA(FSA):
         return s 
 
 if __name__ == "__main__":
-    nfa = NFA(filename='simult_test')
-    print(nfa.test_simultaneous("ac", trace=True))
+    # nfa = NFA(filename='simult_test')
+    # print(nfa.test_simultaneous("ac", trace=True))
+    a = Transition_Graph(filename="simult_test")

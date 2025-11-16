@@ -26,13 +26,13 @@ class Test_FSA_From_File(unittest.TestCase):
             for test_string in case.accept:
                 msg = f"{case.name} rejected {test_string}"
                 self.assertTrue(test_nfa.test(test_string), msg)
-                self.assertTrue(test_nfa.test_simultaneous(test_string), msg + " simult")
+                self.assertTrue(test_nfa.test_backtrack(test_string), msg + " backtrack")
                 self.assertTrue(test_dfa.test(test_string), msg)
 
             for test_string in case.reject:
                 msg = f"{case.name} accepted {test_string}"
                 self.assertFalse(test_nfa.test(test_string), msg)
-                self.assertFalse(test_nfa.test_simultaneous(test_string), msg + " simult")
+                self.assertFalse(test_nfa.test_backtrack(test_string), msg + " backtrack")
                 self.assertFalse(test_dfa.test(test_string), msg)
         print(SUCCESS_MSG)
 
@@ -58,14 +58,14 @@ class Test_FSA_From_Regex(unittest.TestCase):
             for test_string in case.accepted:
                 msg = f"{case.regex} rejected {test_string}"
                 self.assertTrue(test_nfa.test(test_string), "NFA for " + msg)
-                self.assertTrue(test_nfa.test_simultaneous(test_string), msg + " simult")
+                self.assertTrue(test_nfa.test_backtrack(test_string), msg + " backtrack")
                 self.assertTrue(test_dfa.test(test_string), "DFA for " + msg)
                 rt_msg = "NFA->regex->NFA for " + msg
                 self.assertTrue(round_trip_fsa.test(test_string), rt_msg)
             for test_string in case.rejected:
                 msg = f"{case.regex} accepted {test_string}"
                 self.assertFalse(test_nfa.test(test_string), "NFA for " + msg)
-                self.assertFalse(test_nfa.test_simultaneous(test_string), msg + " simult")
+                self.assertFalse(test_nfa.test_backtrack(test_string), msg + " backtrack")
                 self.assertFalse(test_dfa.test(test_string), "DFA for " + msg)
                 rt_msg = "NFA->regex->NFA for " + msg
                 self.assertFalse(round_trip_fsa.test(test_string), rt_msg)

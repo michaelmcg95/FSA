@@ -21,12 +21,19 @@ help: display information on using the program.
 quit: end the program.
 load file [filename]: load a FSA from a state transition file.
 load regex [regex]: load a FSA from a regex expression.
-test [string]: check if FSA accepts string.
+test [options] [string]: check if FSA accepts string. if -b option given
+    test using backtracking method
 trace: toggle tracing. When activated, display a list of states visited
     when testing strings.
 print: print a text description of the FSA's transition graph.
 regex: generate an equivalent regex from FSA.
 '''
+
+def make_fsa(tg):
+    """Make a DFA is possible, otherwise make NFA"""
+    if tg.is_dfa():
+        return DFA(tg=tg)
+    return NFA(tg=tg)
     
 if __name__ == "__main__":
     print("Welcome to FSA simulator. Type 'help' for instructions.")
@@ -56,26 +63,34 @@ if __name__ == "__main__":
                 print("Error: no filename given. Usage: 'import <filename>'")
             else:
                 try:
-                    my_fsa = NFA(jflap=words[1])
+                    tg = Transition_Graph(jflap=words[2])
+                    my_fsa = make_fsa(tg)
                     print("Imported jflap xml file")
                 except Exception as e:
                     print(e)
         elif command == "load":
             if len(words) < 3:
                 print("Error: missing argument. Load requires 2 arguments")
-            try:
-                if words[1] == "file":
-                    my_fsa = NFA(filename=words[2])
-                    print("file loaded")
-                elif words[1] == "regex":
-                    my_fsa = NFA(regex=words[2])
-                    print("regex loaded")           
-                else:
-                    print("Error: unrecognized option. Use 'file' or 'regex'.")
-            except (FSA_Error, SyntaxError) as e:
-                print("Error in FSA file:", e)
-            except Exception as e:
-                print(e)
+            # try:
+            if words[1] == "file":
+                tg = Transition_Graph(filename=words[2])
+                my_fsa = make_fsa(tg)
+                print("file loaded")
+            elif words[1] == "regex":
+                my_fsa = NFA(regex=words[2])
+                print("regex loaded")           
+            else:
+                print("Error: unrecognized option. Use 'file' or 'regex'.")
+            # except (FSA_Error, SyntaxError) as e:
+            #     print("Error in FSA file:", e)
+
+        elif command == "type":
+            if isinstance(my_fsa, DFA):
+                print("DFA")
+            elif isinstance(my_fsa, NFA):
+                print("NFA")
+            else:
+                print("No automaton loaded")
 
         # Commands after this point require a FSA to be loaded
         elif my_fsa is None:
@@ -86,7 +101,17 @@ if __name__ == "__main__":
             if len(words) < 2:
                 print("Error: no string given. Usage: 'test <string>'")
             else:
-                result = my_fsa.test(words[1], trace)
+                backtrack = False
+                test_string = words[1]
+                if len(words) >= 3 and words[1][0] == "-":
+                    options = words[1][1:]
+                    test_string = words[2]
+                    if "b" in options:
+                        backtrack = True
+                if isinstance(my_fsa, NFA) and backtrack:
+                    result = my_fsa.test_backtrack(test_string, trace)
+                else:
+                    result = my_fsa.test(test_string, trace)
                 print(ACCEPT_REJECT[result])
         elif command == "regex":
             print(my_fsa.to_regex())
