@@ -89,7 +89,7 @@ class Transition_Graph:
             return False
         for transitions in self.state_dict.values():
             # total transition function
-            if self.transition_chars - set(transitions.keys()):
+            if self.transition_chars != set(transitions.keys()):
                 return False
             # one transition for each symbol
             for  dest_labels in transitions.values():
@@ -503,6 +503,9 @@ class NFA(FSA):
 
     def test(self, s, trace=False):
         """Test if NFA accepts a string using multiple simultaneous paths"""
+        if trace:
+            print("Remaining String    States")
+            print("-" * 80)
 
         def _test(s, current_states):
             # follow lambda transitions
@@ -512,9 +515,7 @@ class NFA(FSA):
             current_states |= lambda_states
 
             if trace:
-                print("Remaining String     States")
-                print("-" * 80)
-                print(f"{s:20} {current_states}", end="\n\n")
+                print(f"{s:20}{current_states}")
 
             # base case: no path to a final state on s
             if len(current_states) == 0:
@@ -528,7 +529,7 @@ class NFA(FSA):
             new_states = set()
             for state in current_states:
                 # Find states reachable on next char in string
-                reachable = state.outgoing.get(s[0], [])
+                reachable = state.outgoing.get(s[0], ())
                 # for each state, create a new path by extending existing path
                 for next_state in reachable:
                     new_states.add(next_state)
@@ -536,76 +537,66 @@ class NFA(FSA):
 
         s = "" if s == LAMBDA_CHAR else s
         return _test(s, {self.init_state})
-
+    
     def test_backtrack(self, s, trace=False):
-        """Test if NFA accepts string using backtracking method"""
-        def print_trace(trans, label, str):
-            print(f"{label:<13}{trans:15}{str}")
-
-        def try_all_transitions(state, i, try_lambda=False):            
-            if try_lambda:
-                char = LAMBDA_CHAR
-                next_ind = i
-            else:
-                char = s[i]
-                next_ind = i + 1
-            print_char = LAMBDA_CHAR if try_lambda else char
-            for next_state in state.outgoing.get(char, ()):
-                if trace:
-                    print_trace(print_char, next_state.label, s[next_ind:])
-                if _test(s, next_ind, next_state):
-                    return True
-            return False
-
+        """Test if NFA accepts string using backtracking"""
         if trace:
-            print("State         In Transition  Remaining String")
-            print("-" * 50)
-            print_trace("(start)", self.init_state.label, s)
+            trace = [f"{'State':20}Remaining String", "-" * 80]
 
-        visit_ind = defaultdict(set)
+        def _test(s, state, visited=None, path=""):
+            if path != "":
+                path += "-"
+            path += state.label
 
-        def _test(s, index, state):
-            # check if state visited at same index to avoid infinite recursion
-            if index in visit_ind[state]:
-                if trace:
-                    print(f"{state.label}: backtracking to avoid infinite loop.")
-                return False
-            visit_ind[state].add(index)
+            if trace:
+                trace.append(f"{path:20}{s}")
 
             # Success: reached end of string in final state
-            if index == len(s) and state in self.final_states:
+            if s == "" and state in self.final_states:
+                if trace:
+                    trace[-1] += " end of string in final state"
                 return True
             
+            if visited == None:
+                visited = set()
+
+            # check if state visited at same index to avoid infinite recursion
+            if state in visited:
+                if trace:
+                    trace[-1] += " *lambda cycle detected"
+                return False
+            
+            visited.add(state)
+
             # Try all lambda transitions
-            if try_all_transitions(state, index, try_lambda=True):
-                return True
+            for next_state in state.outgoing.get(LAMBDA_CHAR, ()):
+                if _test(s, next_state, visited, path=path):
+                    return True
+
                      
             # At end of string but not in final state
-            if index == len(s):
+            if s == "":
                 if trace:
-                    print(state.label, end="")
-                    print(": At end of string but not in final state.")
+                    trace[-1] += " *end of string but in nonfinal state"
                 return False
             
             # Try non-lambda transitions
-            if try_all_transitions(state, index):
-                return True
-
+            for next_state in state.outgoing.get(s[0], ()):
+                if _test(s[1:], next_state, path=path):
+                    return True
+                    
             # No viable transitions found
             if trace:
-                msg = f"No path from {state.label} with {s[index:]}"
-                print(msg)
+                trace.append(f"{path:20}{s} *no path to final state")
             return False
 
-        if s == LAMBDA_CHAR:
-            s = ""
-        accepted = _test(s, 0, self.init_state)
+        s = "" if s == LAMBDA_CHAR else s
+        result = _test(s, self.init_state)
         if trace:
-            if accepted:
-                print(f"{s} accepted")
-            else:
-                print(f"{s} rejected")
-        return accepted
+            for line in trace:
+                print(line)
+        return result
+
     
     def get_alphabet(self):
         """Get set of characters consumed in transitions"""
@@ -816,8 +807,10 @@ class DFA(FSA):
         return s 
 
 if __name__ == "__main__":
+    a = NFA(filename="backtrack_test")
+    print(a.test_backtrack("ab", trace=True))
     # nfa = NFA(filename='simult_test')
     # print(nfa)
     # print(nfa.test_simultaneous("ac", trace=True))
-    a = NFA(filename="is_dfa_test")
-    print(a)
+    # a = NFA(filename="is_dfa_test")
+    # print(a)
