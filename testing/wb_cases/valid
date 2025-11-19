@@ -1,0 +1,15 @@
+a               a
+(a)             a
+ab              (. a b)
+a|b             (| a b)
+(a|b)           (| a b)
+a(ab*|c(b|^))*  (. a (* (| (. a (* b)) (. c (| b ^)))))
+a|bc*           (| a (. b (* c)))
+a|b*c           (| a (. (* b) c))
+ab|c*           (| (. a b) (* c))
+ab*|c           (| (. a (* b)) c)
+a*b|c           (| (. (* a) b) c)
+a*|bc           (| (* a) (. b c))
+a|b|cd          (| a b (. c d))
+abc*            (. a b (* c))
+a|b|c*          (| a b (* c))
