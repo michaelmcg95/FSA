@@ -7,6 +7,7 @@
 # Due October 10, 2025
 
 from fsa import *
+import os
 import readline
 
 PROMPT = "> "
@@ -41,7 +42,14 @@ def make_fsa(tg):
     if tg.is_dfa():
         return DFA(tg=tg)
     return NFA(tg=tg)
-    
+
+def check_overwrite(filename):
+    ok_to_write = True
+    if os.path.isfile(filename):
+        ok_to_write = input("File exists: overwrite? (y/n): ")
+        ok_to_write = ok_to_write[0].upper() != 'N'
+    return ok_to_write
+
 if __name__ == "__main__":
     print("Welcome to FSA simulator. Type 'help' for instructions.")
     running = True
@@ -55,7 +63,7 @@ if __name__ == "__main__":
         if command == "":
             continue
         
-        if command in ("exit", "quit"):
+        if command in ("exit", "quit", "q"):
             running = False
         elif command == "help":
             print(HELP_TEXT)
@@ -69,27 +77,39 @@ if __name__ == "__main__":
             if len(words) < 2:
                 print("Error: no filename given. Usage: 'import <filename>'")
             else:
-                try:
-                    tg = Transition_Graph(jflap=words[2])
-                    my_fsa = make_fsa(tg)
-                    print("Imported jflap xml file")
-                except Exception as e:
-                    print(e)
+                filename = words[1]
+                if os.path.isfile(filename):
+                    try:
+                        tg = Transition_Graph(jflap=words[1])
+                        my_fsa = make_fsa(tg)
+                        print("Imported jflap xml file")
+                    except FSA_Error as e:
+                        print("Invalid file:", e)
+                else:
+                    print("Error: cannot open", filename)        
         elif command == "load":
-            if len(words) < 3:
-                print("Error: missing argument. Load requires 2 arguments")
-            # try:
-            if words[1] == "file":
-                tg = Transition_Graph(filename=words[2])
-                my_fsa = make_fsa(tg)
-                print("file loaded")
-            elif words[1] == "regex":
+            if len(words) < 2:
+                print("Error: Load requires at least 2 arguments")
+            filename = None
+            if len(words) == 2:
+                filename = words[1]
+            elif words[1] in ("-f", "file"):
+                filename=words[2]
+            if filename:
+                if os.path.isfile(filename):
+                    try:
+                        tg = Transition_Graph(filename=filename)
+                        my_fsa = make_fsa(tg)
+                        print("file loaded")
+                    except FSA_Error as e:
+                        print("Invalid file:", e)
+                else:
+                    print("Error: cannot open", filename)
+            elif words[1] in ("-r", "regex"):
                 my_fsa = NFA(regex=words[2])
                 print("regex loaded")           
             else:
-                print("Error: unrecognized option. Use 'file' or 'regex'.")
-            # except (FSA_Error, SyntaxError) as e:
-            #     print("Error in FSA file:", e)
+                print("Error: unrecognized load option. Use 'file' or 'regex'.")
 
         elif command == "type":
             if isinstance(my_fsa, DFA):
@@ -102,9 +122,9 @@ if __name__ == "__main__":
         # Commands after this point require a FSA to be loaded
         elif my_fsa is None:
             print("Error: no FSA loaded")
-        elif command == "print":
+        elif command in ("p", "print"):
             print(my_fsa)
-        elif command == "test":
+        elif command in ("t", "test"):
             if len(words) < 2:
                 print("Error: no string given. Usage: 'test <string>'")
             else:
@@ -130,8 +150,13 @@ if __name__ == "__main__":
             elif my_fsa is None:
                 print("Error: no FSA loaded")
             else:
-                my_fsa.write_file(words[1])
-                print("Wrote transition graph to", words[1])
+                filename = words[1]
+                ok_to_write = check_overwrite(filename)
+                if ok_to_write:
+                    my_fsa.write_file(filename)
+                    print("Wrote transition graph to", filename)
+                else:
+                    print("Write canceled")
         elif command == "reduce":
             if isinstance(my_fsa, DFA):
                 num_state_before = len(my_fsa.get_state_list())

@@ -11,22 +11,6 @@ MAX_LENGTH = 6
 NUM_LETTERS = 4
 NUM_TESTS = 20
 
-class Failed_Case:
-    def __init__(self, regex, tree, case, expected, actual):
-        self.regex = regex
-        self.tree = tree
-        self.case = case
-        self.expected = expected
-        self.actual = actual
-
-    def __str__(self):
-        s  = f"Regex:    {self.regex}\n"
-        s += f"Tree:     {self.tree}\n"
-        s += f"Case:     {self.case}\n"
-        s += f"Expected: {self.expected}\n"
-        s += f"Actual:   {self.actual}\n"
-        return s
-
 class Regex_Case:
     def __init__(self, tree, accepted, rejected):
         self.tree = tree
@@ -55,17 +39,21 @@ class Regex_Case_Generator:
         tree = self._make_random_tree(num_letters)
         return self._make_regex_test_case(tree)
     
-    def _make_random_tree(self, num_leaves):
+    def _make_random_tree(self, num_leaves, lambda_ok=False):
         """Make a random regex parse tree"""
         if num_leaves == 1:
-            node = make_node(random.choice(self.alphabet))
-        elif num_leaves > 1:
+            if lambda_ok and random.randint(0, 3) == 0:
+                node = LAMBDA_NODE
+            else:
+                node = CHAR_NODES[random.choice(self.alphabet)]
+        else:
             left_leaves = random.randint(1, num_leaves - 1)
-            left = self._make_random_tree(left_leaves)
-            right = self._make_random_tree(num_leaves - left_leaves)
             node_type = random.choice(self.bin_node_types)
+            lambda_ok = node_type == Union_Node
+            left = self._make_random_tree(left_leaves, lambda_ok)
+            right = self._make_random_tree(num_leaves - left_leaves, lambda_ok)
             node = node_type(left, right)
-        if random.randint(0, 10) < 3:
+        if random.randint(0, 9) < 2:
             node = Star_Node(node)
         return node
 
@@ -75,6 +63,9 @@ class Regex_Case_Generator:
 
         if isinstance(parse_tree, Character_Node):
             accepted.add(parse_tree.char)
+
+        elif parse_tree == LAMBDA_NODE:
+            accepted.add("")
 
         elif isinstance(parse_tree, Star_Node):
             accepted.add("")
@@ -124,3 +115,7 @@ class Test_Random_Regex(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+    # g = Regex_Case_Generator(4, 6)
+    # for _ in range(20):
+    #     c = g.generate()
+    #     print(c.regex)

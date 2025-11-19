@@ -7,7 +7,7 @@ import regex
 import os
 from fsa import *
 from testing.fsa_cases import fsa_cases
-from testing.fsa_regex_cases import fsa_regex_cases
+from load_regex_cases import load_regex_cases
 
 SUCCESS_MSG = "\nAll tests passed"
 
@@ -50,7 +50,8 @@ class Test_FSA_From_Regex(unittest.TestCase):
     """Test fsa created from regex string"""
     def test_fsa_regex(self):
         print_test_desc("Testing valid regexes")
-        for case in fsa_regex_cases:
+        cases = load_regex_cases("testing/regex_test_cases")
+        for case in cases:
             print(case.regex)
             test_nfa = NFA(regex=case.regex)
             test_dfa = DFA(nfa=test_nfa).reduce()
