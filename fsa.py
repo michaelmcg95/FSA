@@ -541,20 +541,22 @@ class NFA(FSA):
     def test_backtrack(self, s, trace=False):
         """Test if NFA accepts string using backtracking"""
         if trace:
-            trace = [f"{'State':20}Remaining String", "-" * 80]
+            print(f"{'Path':20}{'Remaining String':20}Message")
+            print( "-" * 80)
 
         def _test(s, state, visited=None, path=""):
             if path != "":
                 path += "-"
             path += state.label
 
+            current_config = f"{path:20}{s:20}"
             if trace:
-                trace.append(f"{path:20}{s}")
+                print(current_config + "entering state")
 
             # Success: reached end of string in final state
             if s == "" and state in self.final_states:
                 if trace:
-                    trace[-1] += " end of string in final state"
+                    print(current_config + "end of string in final state")
                 return True
             
             if visited == None:
@@ -563,7 +565,7 @@ class NFA(FSA):
             # check if state visited at same index to avoid infinite recursion
             if state in visited:
                 if trace:
-                    trace[-1] += " *lambda cycle detected"
+                    print(current_config + "lambda cycle detected")
                 return False
             
             visited.add(state)
@@ -577,7 +579,7 @@ class NFA(FSA):
             # At end of string but not in final state
             if s == "":
                 if trace:
-                    trace[-1] += " *end of string but in nonfinal state"
+                    print(current_config + "end of string but in nonfinal state")
                 return False
             
             # Try non-lambda transitions
@@ -587,16 +589,11 @@ class NFA(FSA):
                     
             # No viable transitions found
             if trace:
-                trace.append(f"{path:20}{s} *no path to final state")
+                print(current_config + "no path to final state")
             return False
 
         s = "" if s == LAMBDA_CHAR else s
-        result = _test(s, self.init_state)
-        if trace:
-            for line in trace:
-                print(line)
-        return result
-
+        return _test(s, self.init_state)
     
     def get_alphabet(self):
         """Get set of characters consumed in transitions"""

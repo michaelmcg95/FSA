@@ -2,11 +2,14 @@
 
 import random
 from regex import *
-import fsa
+from fsa import NFA
 import string
+import unittest
 
-REJECT_CHAR = "X"
-NUM_CASES = 5
+ALPHABET_SIZE = 4
+MAX_LENGTH = 6
+NUM_LETTERS = 4
+NUM_TESTS = 20
 
 class Failed_Case:
     def __init__(self, regex, tree, case, expected, actual):
@@ -24,166 +27,100 @@ class Failed_Case:
         s += f"Actual:   {self.actual}\n"
         return s
 
-class Parse_Tree_Generator:
-    """Generate random regex parse trees"""
-    def __init__(self, alphabet_size=26, allow_repeat=False):
-        self.chars = string.ascii_lowercase[:alphabet_size]
-        self.bin_node_types = [Union_Node, Cat_Node]
-        self.next_char_index = 0
-        self.allow_repeat = allow_repeat
+class Regex_Case:
+    def __init__(self, tree, accepted, rejected):
+        self.tree = tree
+        self.regex = tree.regex()
+        self.accepted = accepted
+        self.rejected = rejected
 
-    def _get_next_char(self):
-        if self.allow_repeat:
-            return random.choice(self.chars)
-        result = self.chars[self.next_char_index]
-        self.next_char_index += 1
-        return result
+class Regex_Case_Generator:
+    """Generate random regex test cases"""
+    def __init__(self, alphabet_size, max_len):
+        self.alphabet = string.ascii_lowercase[:alphabet_size]
+        self.max_len = max_len
+        self.bin_node_types = [Union_Node, Cat_Node]   
+        self.all_strings = [""]
+        prev_len_strings = self.all_strings
+        for i in range(0, max_len):
+            new_strings = []
+            for char in self.alphabet:
+                new_strings += [s + char for s in prev_len_strings]
+            self.all_strings += (new_strings)
+            prev_len_strings = new_strings
+        self.all_strings = set(self.all_strings)
+
+    def generate(self, num_letters=NUM_LETTERS):
+        """Generate a random test case"""
+        tree = self._make_random_tree(num_letters)
+        return self._make_regex_test_case(tree)
     
     def _make_random_tree(self, num_leaves):
+        """Make a random regex parse tree"""
         if num_leaves == 1:
-            node = make_node(self._get_next_char())
+            node = make_node(random.choice(self.alphabet))
         elif num_leaves > 1:
             left_leaves = random.randint(1, num_leaves - 1)
             left = self._make_random_tree(left_leaves)
             right = self._make_random_tree(num_leaves - left_leaves)
             node_type = random.choice(self.bin_node_types)
             node = node_type(left, right)
-        starred = random.randint(0, 10) < 3
-        if starred:
+        if random.randint(0, 10) < 3:
             node = Star_Node(node)
         return node
 
-    def get_random_parse_tree(self, num_leaves):
-        self.next_char_index = 0
-        return self._make_random_tree(num_leaves)
-    
-    def run_tests(self, tree_sizes, trees_per_size):
-        """Run tests on a random regex parse tree generator"""
-        failed = []
-        for size in tree_sizes:
-            for _ in range(trees_per_size):
-                tree = self.get_random_parse_tree(size)
-                test_fsa = fsa.FSA(node=simplify(tree))
-                accepted, rejected = make_regex_test_cases(tree)
-                regex = tree.regex()
-                for case_set, expected in ((accepted, True), (rejected, False)):
-                    for case in case_set:
-                        try:
-                            actual = test_fsa.test(case)
-                            if actual != expected:
-                                failed.append(Failed_Case(
-                                                regex=regex,
-                                                tree=tree,
-                                                case=case,
-                                                expected=expected,
-                                                actual=actual))
-                        except RecursionError:
-                            failed.append(Failed_Case(
-                                            regex=regex,
-                                            tree=tree,
-                                            case=case,
-                                            expected=expected,
-                                            actual="recursion error"))
-        return failed
+    def _make_regex_test_case(self, parse_tree):
+        """Generate accepted and rejected strings from a regex parse tree"""
+        accepted = set()
 
-def strip_lambda_char(str_set):
-    """Strip lambda characters from each string in set. But for strings
-    consisting only of lambda characters, leave one."""
-    result = set()
-    for s in str_set:
-        s = s.strip(LAMBDA_CHAR)
-        if s == "":
-            result.add(LAMBDA_CHAR)
-        else:
-            result.add(s)
-    return result
+        if isinstance(parse_tree, Character_Node):
+            accepted.add(parse_tree.char)
 
-def make_regex_test_cases(parse_tree):
-    """Generate accepted and rejected strings from a regex parse tree"""
-    accepted, rejected = set(), set()
-    rejected.add(REJECT_CHAR)
+        elif isinstance(parse_tree, Star_Node):
+            accepted.add("")
+            child_test_case = self._make_regex_test_case(parse_tree.child)
+            child_accept =  child_test_case.accepted - {""}
+            new_concats = child_accept
+            while new_concats:
+                accepted |= new_concats
+                prev_concats = new_concats
+                new_concats = set()
+                for concat_string in prev_concats:
+                    for s in child_accept:
+                        new_string = concat_string + s
+                        if len(new_string) <= self.max_len:
+                            new_concats.add(new_string)
 
-    if isinstance(parse_tree, Character_Node):
-        accepted.add(parse_tree.char)
-        rejected.add(LAMBDA_CHAR)
+        elif isinstance(parse_tree, Bin_Op_Node):
+            left_accepted = self._make_regex_test_case(parse_tree.left).accepted
+            right_accepted = self._make_regex_test_case(parse_tree.right).accepted
 
-    elif isinstance(parse_tree, Star_Node):
-        child_accept, child_reject = make_regex_test_cases(parse_tree.child)
-        accepted.add(LAMBDA_CHAR)
-        child_accept_list = list(child_accept)
-        for _ in range(min(NUM_CASES, len(child_accept))):
-            accepted.add(child_accept.pop())
-        for _ in range(NUM_CASES):
-            cat_str = ""
-            for _ in range(3):
-                s = random.choice(child_accept_list)
-                if s != LAMBDA_CHAR:
-                    cat_str += s
-            if cat_str == "":
-                cat_str = LAMBDA_CHAR
-            accepted.add(cat_str)
-        for _ in range(min(NUM_CASES, len(child_reject))):
-            test_str = child_reject.pop()
-            if test_str != LAMBDA_CHAR:
-                rejected.add(test_str)
+            if isinstance(parse_tree, Cat_Node):
+                for left_str in left_accepted:
+                    for right_str in right_accepted:
+                        new_string = left_str + right_str
+                        if len(new_string) <= self.max_len:
+                            accepted.add(new_string)
 
-    elif isinstance(parse_tree, Bin_Op_Node):
-        left_accept, left_reject = make_regex_test_cases(parse_tree.left)
-        right_accept, right_reject = make_regex_test_cases(parse_tree.right)
-        l_accept_list = list(left_accept)
-        r_accept_list = list(right_accept)
+            elif isinstance(parse_tree, Union_Node):
+                accepted = left_accepted | right_accepted
 
-        if isinstance(parse_tree, Cat_Node):
-            if LAMBDA_CHAR in left_accept and LAMBDA_CHAR in right_accept:
-                accepted.add(LAMBDA_CHAR)
-            else:
-                rejected.add(LAMBDA_CHAR)
+        rejected = self.all_strings - accepted
+        return Regex_Case(parse_tree, accepted, rejected)
 
-            for _ in range(min(NUM_CASES, len(left_accept))):
-                l_str = random.choice(l_accept_list)
-                r_str = random.choice(r_accept_list)
-                test_str = l_str + r_str
-                accepted.add(test_str)
-
-            rejected.add(random.choice(r_accept_list) + REJECT_CHAR)
-            rejected.add(random.choice(l_accept_list) + REJECT_CHAR)
-
-
-        elif isinstance(parse_tree, Union_Node):
-            if LAMBDA_CHAR in left_accept or LAMBDA_CHAR in right_accept:
-                accepted.add(LAMBDA_CHAR)
-            else:
-                rejected.add(LAMBDA_CHAR)
-
-            for _ in range(min(NUM_CASES, len(left_accept))):
-                accepted.add(left_accept.pop())
-            for _ in range(min(NUM_CASES, len(right_accept))):
-                accepted.add(right_accept.pop())
-            both_reject = left_reject.intersection(right_reject)
-            for _ in range(min(NUM_CASES, len(both_reject))):
-                rejected.add(both_reject.pop())
-            rejected.add(random.choice(l_accept_list) + REJECT_CHAR)
-            rejected.add(random.choice(r_accept_list) + REJECT_CHAR)
-
-    accepted = strip_lambda_char(accepted)
-    rejected = strip_lambda_char(rejected)
-    return accepted, rejected
-
-def run_random_tests(tree_sizes, trees_per_size):
-    gen_unique_char = Parse_Tree_Generator(allow_repeat=False)
-    gen_repeat_char = Parse_Tree_Generator(alphabet_size=3, allow_repeat=True)
-
-    failed = gen_unique_char.run_tests(tree_sizes, trees_per_size)
-    failed += gen_repeat_char.run_tests(tree_sizes, trees_per_size)
-
-    print(f"Testing complete. {len(failed)} tests failed.")
-    for failed_test in failed:
-        print(failed_test)
+class Test_Random_Regex(unittest.TestCase):
+    def test(self):
+        case_generator = Regex_Case_Generator(ALPHABET_SIZE, MAX_LENGTH)
+        for _ in range(NUM_TESTS):
+            test_case = case_generator.generate()
+            print("Testing " + test_case.regex)
+            nfa = NFA(node=test_case.tree)
+            msg = test_case.regex + " rejected "
+            for s in test_case.accepted:
+                self.assertTrue(nfa.test(s), msg + s)
+            msg = test_case.regex + " accepted "
+            for s in test_case.rejected:
+                self.assertFalse(nfa.test(s), msg + s)
 
 if __name__ == "__main__":
-    run_random_tests([3, 5, 8], 20)
-    # tree_generator = Parse_Tree_Generator(alphabet_size=3, allow_repeat=True)
-    # tree = tree_generator.get_random_parse_tree(7)
-    # print(tree, tree.regex())
-    # print(make_regex_test_cases(tree))
-    # print(make_regex_test_cases(parse("(a(b+cde+f*g))*")))
+    unittest.main()
