@@ -6,7 +6,7 @@ import unittest
 import regex
 import os
 from fsa import *
-from testing.fsa_cases import fsa_cases
+from load_fsa_cases import load_fsa_cases
 from load_regex_cases import load_regex_cases
 
 SUCCESS_MSG = "\nAll tests passed"
@@ -19,18 +19,19 @@ def print_test_desc(test_desc):
 class Test_FSA_From_File(unittest.TestCase):
     def test_fsa(self):
         print_test_desc("Testing valid transition graph files")
+        fsa_cases = load_fsa_cases("testing/bb_cases")
         for case in fsa_cases:
-            print(case.name)
-            test_nfa = NFA(filename=f"testing/fsa_cases/{case.name}.fsa")
+            print(case.path)
+            test_nfa = NFA(jflap=f"{case.path}.jff")
             test_dfa = DFA(nfa = test_nfa).reduce()
             for test_string in case.accept:
-                msg = f"{case.name} rejected {test_string}"
+                msg = f"{case.path} rejected {test_string}"
                 self.assertTrue(test_nfa.test(test_string), msg)
                 self.assertTrue(test_nfa.test_backtrack(test_string), msg + " backtrack")
                 self.assertTrue(test_dfa.test(test_string), msg)
 
             for test_string in case.reject:
-                msg = f"{case.name} accepted {test_string}"
+                msg = f"{case.path} accepted {test_string}"
                 self.assertFalse(test_nfa.test(test_string), msg)
                 self.assertFalse(test_nfa.test_backtrack(test_string), msg + " backtrack")
                 self.assertFalse(test_dfa.test(test_string), msg)

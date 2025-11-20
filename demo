@@ -10,17 +10,32 @@
 # the colon is optional. Any character can be used here.
 # use '^' to indicate a lambda transition (empty string)
 
-@q0
+@0
 !
-a: q0 q2
-b: q1 
-
-@q1
-b: q2
-^: q2
-
-@q2
 *
-a: q2
+^: 1 2
+a: 0
+a: 3
+
+@1
+*
+a: 4
+
+@2
 
 
+@3
+^: 6
+*
+
+@4
+b: 5
+
+@5
+*
+
+@6
+c: 7
+
+@7
+*

@@ -8,12 +8,14 @@ class Regex_Test_Case:
         self.parse_tree = None
         self.accepted = None
         self.rejected = None
+        self.num_states = None
     
     def is_complete(self):
         return all((self.regex, self.parse_tree,
                     self.accepted is not None, self.rejected is not None))
 
 def load_regex_cases(filename):
+    """Load all regex test cases from file"""
     cases = []
 
     with open(filename, "r") as file:
@@ -21,24 +23,26 @@ def load_regex_cases(filename):
 
     case = None
     for line in lines:
-        first_char = line[0].lower()
+        descriptor = line[0].lower()
         # skip empty lines and comment
-        if first_char in ['-', '\n', COMMENT_CHAR]:
+        if descriptor in ['-', '\n', COMMENT_CHAR]:
             continue
+        line_value = line.split(":")[1].strip()
+        line_words = line_value.split()
         # start of new case
-        elif first_char == "r":
+        if descriptor == "r":
             if case:
                 cases.append(case)
-            case = Regex_Test_Case(line.split(":")[1].strip())
-        elif line[0].lower() == "p":
-            case.parse_tree = line.split(":")[1].strip()
+            case = Regex_Test_Case(regex=line_value)
+        elif descriptor == "p":
+            case.parse_tree = line_value
+        elif descriptor == "n":
+            case.num_states = int(line_words[0])
         else:
-            words = line.split()
-            test_strings = words[1:]
-            if first_char == "t":
-                case.accepted = test_strings
-            elif first_char == "f":
-                case.rejected = test_strings
+            if descriptor == "t":
+                case.accepted = line_words
+            elif descriptor == "f":
+                case.rejected = line_words
     if case:
         cases.append(case)
     return cases

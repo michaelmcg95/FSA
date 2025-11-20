@@ -79,7 +79,7 @@ class Transition_Graph:
                 to_label = elem.find("to").text
                 if from_label not in self.state_dict:
                     self.state_dict[from_label] = defaultdict(list)
-                    self.transition_chars.add(char)
+                self.transition_chars.add(char)
                 self.state_dict[from_label][char].append(to_label)
          
     def is_dfa(self):
@@ -439,7 +439,7 @@ class NFA(FSA):
                 state.add_transition(LAMBDA_CHAR, self.init_state)
             else:
                 self.init_state.merge(state)
-        self.final_states.add(self.init_state)
+        self.final_states = {self.init_state}
 
     def eval_leaf_node(self, char=None):
         """Create FSA from character, lambda, or null node"""
@@ -804,8 +804,10 @@ class DFA(FSA):
         return s 
 
 if __name__ == "__main__":
-    a = NFA(filename="backtrack_test")
-    print(a.test_backtrack("ab", trace=True))
+    a = Transition_Graph(jflap="testing/wb_cases/dfa_test.jff")
+    print(a.is_dfa())
+    # a = NFA(filename="backtrack_test")
+    # print(a.test_backtrack("ab", trace=True))
     # nfa = NFA(filename='simult_test')
     # print(nfa)
     # print(nfa.test_simultaneous("ac", trace=True))

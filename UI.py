@@ -84,7 +84,9 @@ if __name__ == "__main__":
                         my_fsa = make_fsa(tg)
                         print("Imported jflap xml file")
                     except FSA_Error as e:
-                        print("Invalid file:", e)
+                        print("File is not a valid FSA:", e)
+                    except Exception as e:
+                        print("Invalid file format:", e)
                 else:
                     print("Error: cannot open", filename)        
         elif command == "load":

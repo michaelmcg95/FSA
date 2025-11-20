@@ -1,0 +1,105 @@
+# Tests for regex to NFA conversion
+
+# LAMBDA regex
+regex: ^
+P: ^
+N: 1
+T: ^
+F: a xyz
+
+# NULL regex. Technically has 2 states, but final state is unreachable
+regex: ~
+P: ~
+N: 1
+T:
+F: ^ a xyz
+
+################################################################################
+# eval_star_node cases
+################################################################################
+
+# Requires new init state. Final state merged into init state
+Regex: (a*b)*
+P: (* (. (* a) b))
+N: 2
+T: ^ b ab aaaab bab baaab abaab babbab bbb
+F: a ba aaba x xb
+
+# Requires new init state. Final state not merged into init state
+Regex: (a*b*)*
+P: (* (. (* a) (* b)))
+N: 3
+T: ^ a b aa ab ba bb aaa aab aba abb baa bab bba bbb
+F: x ax bx abx
+
+# No new init state needed. Final state not merged into init state
+Regex: ab*
+P: (. a (* b))
+N: 2
+T: a ab abbb
+F: b bbbb x xb aba abab abx
+
+# New init state needed. Final state merged into init state
+Regex: a*b
+P: (. (* a) b)
+N: 2
+T: b ab aaaab
+F: a aaa ax aba ba bx aax
+
+################################################################################
+# eval_cat_node cases
+################################################################################
+
+# Single mergeable final state. Left init state not merged
+Regex: ab
+P: (. a b)
+N: 3
+T: ab
+F: a b xb ax xy
+
+# Single nonmergeable final state
+Regex: a*b*
+P: (. (* a) (* b))
+N: 2
+T: ^ a aaa aaab aaabbb b bbb abbb
+F: ax abx bx ba bab
+
+# 2 final states, 1 mergeable, 1 nonmergeable
+Regex: (a*|b)c
+P: (. (| (* a) b) c)
+N: 4
+T: c ac aac bc
+F: ^ abc acb cac x
+
+# Left init state merged
+Regex: a*b
+P: (. (* a) b)
+N: 2
+T: b ab aaaab
+F: a aaa ax aba ba bx aax
+
+################################################################################
+# eval_cat_node cases
+################################################################################
+
+# No child requires new init state. Right init not in final states.
+# Final states merged
+Regex: a|b
+P: (| a b)
+N: 2
+T: a b
+F: ^ ab ba x
+
+# One child requires new init state. Right init in final states
+Regex: a|b*
+P: (| a (* b))
+N: 3
+T: ^ a b bb bbbbb
+F: ab abb ba bbba ax bx
+
+# Both children requires new init state. Final states not merged
+Regex: a*|b*
+P: (| (* a) (* b))
+N: 3
+T: ^ a aaaa b bbbb
+F: ab aax abx bax x

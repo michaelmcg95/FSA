@@ -30,7 +30,7 @@ F: b ba aaax
 # Two letter regexes
 #-------------------------------------------------------------------------------
 
-regex: ab
+Regex: ab
 P: (. a b)
 T: ab
 F: a b xb ax xy

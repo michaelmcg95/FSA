@@ -13,3 +13,5 @@ a*|bc           (| (* a) (. b c))
 a|b|cd          (| a b (. c d))
 abc*            (. a b (* c))
 a|b|c*          (| a b (* c))
+((((a))))       a
+(((a))(b))      (. a b)
