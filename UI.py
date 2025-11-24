@@ -14,25 +14,26 @@ PROMPT = "> "
 ACCEPT_REJECT = {True: "accept", False: "reject"}
 HELP_TEXT = '''
 This program simulates the operation of finite state automata (FSA).
-To get started, try creating a FSA from a file or regular expression (regex).
+To get started, create an automaton from a file or regular expression (regex).
 You can then print its transition graph and test it with strings.
 
 The following commands are available:
 help: display information on using the program.
 quit: end the program.
-load file [filename]: load a FSA from a state transition graph file.
-load regex [regex]: load a FSA from a regex expression.
-test [options] [string]: check if FSA accepts string. if -b option given
+load file <FILENAME>: load a FSA from a state transition graph file.
+load regex <REGEX>: load a FSA from a regex expression.
+test [options] <STRING>: check if FSA accepts string. if -b option given
     test using backtracking method
+batch <FILENAME>: test all strings in file
 trace: toggle tracing. When activated, display a list of states visited
     when testing strings.
 print: print a text description of the FSA's transition graph.
-write: save FSA as transition graph file
+write <FILENAME>: save FSA as transition graph file
 regex: generate an equivalent regex from FSA.
-import [filename]: load FSA from jflap xml file
-export: save FSA as jflap xml file
+import <FILENAME>: load FSA from jflap xml file
+export <FILENAME>: save FSA as jflap xml file
 reduce: minimize number of states in a DFA
-DFA: convert NFA to DFA
+dfa: convert NFA to DFA
 type: check if current automaton is DFA or NFA
 label: relabel the states of FSA
 '''
@@ -44,11 +45,9 @@ def make_fsa(tg):
     return NFA(tg=tg)
 
 def check_overwrite(filename):
-    ok_to_write = True
-    if os.path.isfile(filename):
-        ok_to_write = input("File exists: overwrite? (y/n): ")
-        ok_to_write = ok_to_write[0].upper() != 'N'
-    return ok_to_write
+    """Ask before overwriting existing file"""
+    msg = "File exists: overwrite? (y/n): "
+    return not os.path.isfile(filename) or input(msg).lower() in ['y', 'yes']
 
 if __name__ == "__main__":
     print("Welcome to FSA simulator. Type 'help' for instructions.")
@@ -65,7 +64,7 @@ if __name__ == "__main__":
         
         if command in ("exit", "quit", "q"):
             running = False
-        elif command == "help":
+        elif command in ("h", "help"):
             print(HELP_TEXT)
         elif command == "trace":
             if trace:
@@ -73,7 +72,7 @@ if __name__ == "__main__":
             else:
                 print("tracing on")
             trace = not trace
-        elif command == "import":
+        elif command in ("i", "import"):
             if len(words) < 2:
                 print("Error: no filename given. Usage: 'import <filename>'")
             else:
@@ -89,7 +88,7 @@ if __name__ == "__main__":
                         print("Invalid file format:", e)
                 else:
                     print("Error: cannot open", filename)        
-        elif command == "load":
+        elif command in ("l", "load"):
             if len(words) < 2:
                 print("Error: Load requires at least 2 arguments")
             filename = None
@@ -146,7 +145,7 @@ if __name__ == "__main__":
             print(my_fsa.to_regex())
         elif command == "label":
             my_fsa.label_states()
-        elif command == "write":
+        elif command in ("w", "write"):
             if len(words) < 2:
                 print("Error: no filename given. Usage: 'write <filename>'")
             elif my_fsa is None:
@@ -178,12 +177,23 @@ if __name__ == "__main__":
             else:
                 my_fsa = DFA(nfa=my_fsa)
                 print("Converted automaton to a DFA")
-        elif command == "export":
+        elif command in ("e", "export"):
             if len(words) < 2:
                 print("Error: no filename given. Usage: 'export <filename>'")
             else:
                 my_fsa.write_jflap(words[1])
                 print("Wrote JFLAP xml to", words[1])
+        elif command in ("b", "batch"):
+            if len(words) < 2:
+                print("Error: no file name given")
+            else:
+                with open(words[1]) as file:
+                    lines = file.readlines()
+                for line in lines:
+                    line = line.strip()
+                    if line == "":
+                        line = LAMBDA_CHAR
+                    print (f"{line:.<15}{ACCEPT_REJECT[my_fsa.test(line)]}")
 
         else:
             print(f"Unrecognized command: {command}")
