@@ -1,4 +1,4 @@
-# Finite State Automata Simulator
+﻿# Finite State Automata Simulator
 By Michael McGuan
 
 mcguanm@oregonstate.edu
@@ -36,9 +36,9 @@ Supervisor: Tim Alcon
 
 ## Summary
 
-This program simulates the operation of finite state autamata (FSA). It supports both deterministic finite state automata (DFA)
+This program simulates the operation of finite state automata (FSA). It supports both deterministic finite state automata (DFA)
 and nondeterministic finite state automata (NFA). The user can create an automaton by loading a text file containing a description of the automaton's states and transitions.
-In addition to plain text format, the program supports importing and exporting JFLAP xml files. Automata created from files are loaded as DFAs if they meet the requirements,
+In addition to plain text format, the program supports importing and exporting Jflap xml files. Automata created from files are loaded as DFAs if they meet the requirements,
 otherwise they are loaded as NFAs. All regexes are loaded as NFAs. Most functions are available to both types of automata, but certain functions are only available for one type or the other.
 Alternatively, the user can input a regular expression (regex) and convert it to an equivalent NFA. Once an automaton is constructed, the user can test
 strings to see if the automaton accepts them. The program allows the user to print a text description of the automaton's transition graph and save it to a file.
@@ -78,7 +78,7 @@ reject
 ```
 The last test '^' is a special character representing the empty string.
 
-To, generate the equivelent regex from this NFA, use the regex command.
+To, generate the equivalent regex from this NFA, use the regex command.
 ```
 > regex
 a*b
@@ -86,12 +86,12 @@ a*b
 These commands are enough to start using the program. For more detailed information and a description of advanced features, see the command descriptions.
 
 ## Commands
-This is a list of all commands available in the program. Some commands can be run by typing just the first letter of the name.
+This is a list of all commands available in the program. As noted below, most commands can be run by typing just the first letter of the name. All commands and options are case insensitive. File names, regexes, and strings are case sensitive.
 
 ### help
 The help command displays a list of all commands available in the program and a brief description of each command's function and the arguments required (if any).
 
-alternate name: h
+Alternate name: h
 
 ### quit
 Quit the program.
@@ -101,14 +101,109 @@ Alternate names: q, exit
 ### load
 Create an automaton from a transition graph file or a regex. The command requires additional arguments as follows:
 ```
-load [file] <FILENAME>
-load -f <FILENAME>
-load regex <REGEX>
-load -r <REGEX>
+load [file | -f] <FILENAME>
+load (regex | -r) <REGEX>
 ```
+With the file or -f option, the command loads a transition file specified by <FILENAME>. If the file contains syntax errors, the load operation will be aborted and the program will display the error. Similarly, if the file is syntactically correct, but describes an invalid automaton, the load operation will fail. A transition graph is invalid if it has no initial state, multiple initial states, or a reference to an undefined state label.
 
+With the regex or -r option, the command creates an automaton from the regex specified by <REGEX>.
 When loading a file, if there are no lambda transitions and exactly one transition is defined for each state for each letter of the input alphabet,
 the automaton is loaded as a DFA, otherwise it will be an NFA. All automata loaded from regexes are NFAs.
+
+Alternate name: l
+
+### test
+Test if the current automaton accepts a string. This command can only be run if an automaton was already created. The syntax for running this command is:
+```
+load [backtrack | -b] <STRING>
+```
+The output will be "accept" if STRING is in the language of the automaton and "reject" otherwise.
+
+If [tracing](#trace) is enabled, the program will print a history of the states the automaton enters as it processes the input. By default, the trace presents a nondeterministic view of NFAs and displays a list of concurrent states the automaton could be in for each character of the input consumed. If the backtrack option is given, the trace explores all paths through the transition graph and shows the NFA in a single state at a time. The backtrack option has no effect if tracing is disabled or the automaton is a DFA.
+
+Alternate name: t
+
+### batch
+Test a collection of strings in a file.
+```
+batch <FILENAME>
+```
+The program opens file specified by the second argument and tests each line of the file with the current automaton. All leading and trailing whitespace is stripped from each line. If the line has only whitespace characters, it is interpreted as the empty string. The output will be the list of strings and the test result for each.
+
+Example use:
+```
+> load -r (ab)*
+regex loaded
+> batch mystrings
+^..............accept
+ab.............accept
+abab...........accept
+ababab.........accept
+b..............reject
+a..............reject
+ba.............reject
+bbb............reject
+```
+
+Alternate name: b
+
+### trace
+Toggle tracing during tests. When enabled, the program displays additional information about the state history of the computation when running the [test](#test) command.
+
+### print
+Display a text representation of the current automaton. The format of the display is the same as for [transition graph files](#file-format).
+
+Alternate name: p
+
+### write
+Write the current automaton to a text file.
+```
+write <FILENAME>
+```
+The automaton is saved in [transition graph file format](#file-format).
+
+Alternate name: w
+
+### regex
+Convert the current automaton to an equivalent regex. As demonstrated below, if the automaton was loaded from a regex, the output may not be precisely the same string as that used to create the automaton, but the regex will accept the same language.
+```
+> load -r a(b|c)
+regex loaded
+> regex
+ab|ac
+```
+
+### import
+Load an automaton from a Jflap xml file. This program was tested with Jflap version 7.1. This command will fail if the xml file cannot be parsed or the file describes an invalid automaton, as defined in the documentation of the [load](#load) command.
+
+```
+import <FILENAME>
+```
+
+Alternate name: i
+
+### export
+Save the current automaton in Jflap xml format. The file produced will be compatible with Jflap version 7.1. Note that the program makes no attempt to create an aesthetically pleasing arrangement of the states and simply places them even spaced on a horizontal line.
+
+```
+export <FILENAME>
+```
+
+Alternate name: e
+
+### reduce
+Minimize the number of states in the current automaton if it is a DFA. This command is only available for DFAs. The labels of the new states will be of the form {q0, q1, ...}, where q0, q1, ... are the labels of indistinguishable states in the old DFA.
+
+Note: to convert an NFA to a DFA, use the command [dfa](#dfa).
+
+### dfa
+Convert the current NFA to a DFA. This command has no effect if the current automaton is already a DFA. The labels of the new states will be of the form {q0, q1, ...}, and the DFA will have a transition on character c from {s0, s1, ...} to {d0, d1, ...} if the NFA had a transition on c from any of the "s" states to any of the "d" states.
+
+### type
+Print the type (DFA or NFA) of the current automaton, or print a message that no automaton is loaded.
+
+### label
+Relabel the states of the current automaton. The labels will be created by enumerating the states in depth-first traversal order, starting with zero.
 
 ## File Format
 Transition graphs can be specified in a plain text file. Lines beginning '#' are comments and will ignored.
