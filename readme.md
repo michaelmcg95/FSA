@@ -126,6 +126,7 @@ load (regex | -r) <REGEX>
 With the file or -f option, the command loads a transition file specified by FILENAME. If the file contains a syntax error, the load operation will be aborted and the program will display the error. Similarly, if the file is syntactically correct, but describes an invalid automaton, the load operation will fail. A transition graph is invalid if it has no initial state, multiple initial states, or a reference to an undefined state label.
 
 With the regex or -r option, the command creates an automaton from the regex specified by REGEX.
+
 When loading a file, if there are no lambda transitions and exactly one transition is defined for each state for each letter of the input alphabet,
 the automaton is loaded as a DFA, otherwise it will be an NFA. All automata loaded from regexes are NFAs.
 
@@ -169,6 +170,79 @@ Alternate name: b
 ### trace
 Toggle tracing during tests. When enabled, the program displays additional information about the state history of the computation when running the [test](#test) command.
 
+To demonstrate the two testing methods, consider the NFA defined in the file demo4.
+
+```
+> load demo4
+file loaded
+> p
+if Label          Transitions
+----------------------------------------------------------------------
+!- 1              ^: [2], a: [7, 1, 5]
+-- 2              ^: [3, 1]
+-- 3              ^: [4]
+-- 4              ^: [1, 2]
+-- 5              b: [6]
+-* 6              
+-- 7              b: [8]
+-- 8 
+```
+
+This is a sample trace using the concurrrent states test method (default): 
+
+```    
+> t ab
+Remaining String    States
+--------------------------------------------------------------------------------
+ab                  {1, 4, 3, 2}
+b                   {1, 4, 3, 5, 7, 2}
+                    {6, 8}
+accept
+```
+
+Here a trace of the same test using the backtracking method.
+
+```
+> t -b ab
+Path                Remaining String    Message
+--------------------------------------------------------------------------------
+1                   ab                  entering state
+1-2                 ab                  entering state
+1-2-3               ab                  entering state
+1-2-3-4             ab                  entering state
+1-2-3-4-1           ab                  entering state
+1-2-3-4-1           ab                  lambda cycle detected
+1-2-3-4-2           ab                  entering state
+1-2-3-4-2           ab                  lambda cycle detected
+1-2-3-4             ab                  no path to final state
+1-2-3               ab                  no path to final state
+1-2-1               ab                  entering state
+1-2-1               ab                  lambda cycle detected
+1-2                 ab                  no path to final state
+1-7                 b                   entering state
+1-7-8                                   entering state
+1-7-8                                   end of string but in nonfinal state
+1-7                 b                   no path to final state
+1-1                 b                   entering state
+1-1-2               b                   entering state
+1-1-2-3             b                   entering state
+1-1-2-3-4           b                   entering state
+1-1-2-3-4-1         b                   entering state
+1-1-2-3-4-1         b                   lambda cycle detected
+1-1-2-3-4-2         b                   entering state
+1-1-2-3-4-2         b                   lambda cycle detected
+1-1-2-3-4           b                   no path to final state
+1-1-2-3             b                   no path to final state
+1-1-2-1             b                   entering state
+1-1-2-1             b                   lambda cycle detected
+1-1-2               b                   no path to final state
+1-1                 b                   no path to final state
+1-5                 b                   entering state
+1-5-6                                   entering state
+1-5-6                                   end of string in final state
+accept
+```
+
 ### print
 Display a text representation of the current automaton. The format of the display is the same as for [transition graph files](#file-format).
 
@@ -202,7 +276,7 @@ import <FILENAME>
 Alternate name: i
 
 ### export
-Save the current automaton in Jflap xml format. The file produced will be compatible with Jflap version 7.1. Note that the program makes no attempt to create an aesthetically pleasing transition diagram and simply places the states evenly spaced on a horizontal line.
+Save the current automaton in Jflap xml format. The file produced will be compatible with Jflap version 7.1. Note that the program makes no attempt to create an aesthetically pleasing transition diagram and simply places the states on a horizontal line.
 
 ```
 export <FILENAME>

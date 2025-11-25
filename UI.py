@@ -91,26 +91,27 @@ if __name__ == "__main__":
         elif command in ("l", "load"):
             if len(words) < 2:
                 print("Error: Load requires at least 2 arguments")
-            filename = None
-            if len(words) == 2:
-                filename = words[1]
-            elif words[1] in ("-f", "file"):
-                filename=words[2]
-            if filename:
-                if os.path.isfile(filename):
-                    try:
-                        tg = Transition_Graph(filename=filename)
-                        my_fsa = make_fsa(tg)
-                        print("file loaded")
-                    except FSA_Error as e:
-                        print("Invalid file:", e)
-                else:
-                    print("Error: cannot open", filename)
-            elif words[1] in ("-r", "regex"):
-                my_fsa = NFA(regex=words[2])
-                print("regex loaded")           
             else:
-                print("Error: unrecognized load option. Use 'file' or 'regex'.")
+                filename = None
+                if len(words) == 2:
+                    filename = words[1]
+                elif words[1] in ("-f", "file"):
+                    filename=words[2]
+                if filename:
+                    if os.path.isfile(filename):
+                        try:
+                            tg = Transition_Graph(filename=filename)
+                            my_fsa = make_fsa(tg)
+                            print("file loaded")
+                        except FSA_Error as e:
+                            print("Invalid file:", e)
+                    else:
+                        print("Error: cannot open", filename)
+                elif words[1] in ("-r", "regex"):
+                    my_fsa = NFA(regex=words[2])
+                    print("regex loaded")           
+                else:
+                    print("Error: unrecognized load option. Use 'file' or 'regex'.")
 
         elif command == "type":
             if isinstance(my_fsa, DFA):

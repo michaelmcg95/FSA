@@ -667,13 +667,13 @@ class DFA(FSA):
         
     def test(self, s, trace=False):
         """Test if DFA accepts a string"""
-        def print_trace(state, char, rem_str):
-            print(f"{state.label:<13}{char:15}{rem_str}")
+        def print_trace(rem_str, state):
+            print(f"{rem_str:20}{state.label}")
 
         if trace:
-            print("State         Character      Remaining String")
-            print("-" * 50)
-            print_trace(self.init_state, "(start)", s)
+            print("Remaining String    State")
+            print("-" * 80)
+            print_trace(s, self.init_state)
 
         if s == LAMBDA_CHAR:
             return self.init_state in self.final_states
@@ -685,7 +685,7 @@ class DFA(FSA):
             if state == None:
                 return False
             if trace:
-                print_trace(state, char, s[i:])
+                print_trace(s[i:], state)
         accepted = state in self.final_states
         if trace:
             if accepted:
