@@ -268,9 +268,9 @@ In expressions containing both union and concatenation, concatenation is conside
   * r|s (union of regex r and s)
   * (r) where r is a regex
 
-  ## References
+## References
 
-  Linz, Peter, and Susan H. Rodger. An Introduction to Formal Languages and Automata, Jones & Bartlett Learning, LLC, 2022. ProQuest Ebook Central, https://ebookcentral.proquest.com/lib/osu/detail.action?docID=6938285.
+Linz, Peter, and Susan H. Rodger. An Introduction to Formal Languages and Automata, Jones & Bartlett Learning, LLC, 2022. ProQuest Ebook Central, https://ebookcentral.proquest.com/lib/osu/detail.action?docID=6938285.
 
-  The methods for converting between NFAs and regexes, converting an NFA to a DFA, and constructing minimal DFAs were adapted from procedures described in chapters 2 and 3 of this book.
+The methods for converting between NFAs and regexes, converting an NFA to a DFA, and constructing minimal DFAs were adapted from procedures described in chapters 2 and 3 of this book.
 
