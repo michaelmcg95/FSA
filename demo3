@@ -1,41 +1,22 @@
-# FSA state description
-# Comments begin with #
-# Begin a state with a label name.
-# Labels must begin with @, but @ is not part of the name.
-# Begin a line with ! or * to indicate a start or final state.
-# ! indicates the start state
-# * inidcates a final state
-# transitions are listed in the form [char]: label1 label2 ...
-# do no separate labels with commas
-# the colon is optional. Any character can be used here.
-# use '^' to indicate a lambda transition (empty string)
-
 @0
 !
-*
-^: 1 2
-a: 0
-a: 3
+1: 3
+0: 1
 
 @1
-*
-a: 4
-
-@2
-
-
-@3
-^: 6
-*
+0: 2
+1: 4
 
 @4
-b: 5
-
-@5
 *
+0: 4
+1: 4
 
-@6
-c: 7
-
-@7
+@2
 *
+0: 1
+1: 4
+
+@3
+1: 4
+0: 2

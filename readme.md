@@ -190,8 +190,9 @@ if Label          Transitions
 
 This is a sample trace using the concurrrent states test method (default): 
 
-```    
-> t ab
+``` 
+> trace   
+[trace]  > t ab
 Remaining String    States
 --------------------------------------------------------------------------------
 ab                  {1, 4, 3, 2}
@@ -203,7 +204,7 @@ accept
 Here a trace of the same test using the backtracking method.
 
 ```
-> t -b ab
+[trace]  > t -b ab
 Path                Remaining String    Message
 --------------------------------------------------------------------------------
 1                   ab                  entering state

@@ -79,7 +79,7 @@ T: b ab aaaab
 F: a aaa ax aba ba bx aax
 
 ################################################################################
-# eval_cat_node cases
+# eval_union_node cases
 ################################################################################
 
 # No child requires new init state. Right init not in final states.

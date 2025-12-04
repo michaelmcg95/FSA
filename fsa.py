@@ -47,8 +47,10 @@ class Transition_Graph:
             if first_char == LABEL_CHAR:
                 current_state_label = words[0][1:]
                 if current_state_label == "":
-                    raise FSA_Error("Missing state label")
+                    raise FSA_Error("Empty state label")
                 self.state_dict[current_state_label] = defaultdict(list)
+            elif current_state_label is None:
+                raise FSA_Error("Missing State Label")
             elif first_char == START_CHAR:
                 if self.init_state_label is not None:
                     raise FSA_Error("Multiple initial states")
@@ -253,8 +255,9 @@ class FSA:
                 if state in self.final_states:
                     file.write(FINAL_CHAR + "\n")
                 for char, dest_states in state.get_transitions().items():
-                    dest_states = " ".join([s.label for s in dest_states])
-                    file.write(f"{char}: {dest_states}\n")
+                    if len(dest_states) > 0:
+                        dest_states = " ".join([s.label for s in dest_states])
+                        file.write(f"{char}: {dest_states}\n")
                 file.write("\n")
 
     def write_jflap(self, filename):
@@ -687,11 +690,6 @@ class DFA(FSA):
             if trace:
                 print_trace(s[i:], state)
         accepted = state in self.final_states
-        if trace:
-            if accepted:
-                print(f"{s} accepted")
-            else:
-                print(f"{s} rejected")
         return accepted
     
     def to_regex(self):
@@ -806,10 +804,3 @@ class DFA(FSA):
 if __name__ == "__main__":
     a = Transition_Graph(jflap="testing/wb_cases/dfa_test.jff")
     print(a.is_dfa())
-    # a = NFA(filename="backtrack_test")
-    # print(a.test_backtrack("ab", trace=True))
-    # nfa = NFA(filename='simult_test')
-    # print(nfa)
-    # print(nfa.test_simultaneous("ac", trace=True))
-    # a = NFA(filename="is_dfa_test")
-    # print(a)

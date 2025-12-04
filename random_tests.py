@@ -8,7 +8,7 @@ import unittest
 
 ALPHABET_SIZE = 4
 MAX_LENGTH = 6
-NUM_LETTERS = 4
+NUM_LETTERS = 5
 NUM_TESTS = 20
 
 class Regex_Case:

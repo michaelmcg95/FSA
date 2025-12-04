@@ -55,7 +55,11 @@ if __name__ == "__main__":
     trace = False
     my_fsa = None
     while running:
+        if trace:
+            print("[trace]  ", end="")
         words = input(PROMPT).lower().split()
+        if len(words) == 0:
+            continue
         command = words[0]
 
         # skip empty lines
@@ -67,10 +71,6 @@ if __name__ == "__main__":
         elif command in ("h", "help"):
             print(HELP_TEXT)
         elif command == "trace":
-            if trace:
-                print("tracing off")
-            else:
-                print("tracing on")
             trace = not trace
         elif command in ("i", "import"):
             if len(words) < 2:

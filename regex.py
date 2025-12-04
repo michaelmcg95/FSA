@@ -1,11 +1,5 @@
 #! /usr/bin/python3
 
-# Michael McGuan
-# CS 406 -- Alcon
-# Project Milestone 6
-# Regex parser for FSA simulator
-# Due November 6, 2025
-
 import string
 from functools import reduce
 
@@ -175,19 +169,20 @@ class Stack():
 def simplify(node, rm_stars=False):
     """Remove redundant nodes from regex parse tree"""
 
-    # remove redunant star nodes from child of star node
+    # simplify star node
     if isinstance(node, Star_Node):
+        # remove redunant star nodes from child of star node
         simplified_child = simplify(node.child, rm_stars=True)
-        if isinstance(simplified_child, (Lambda_Node, Null_Node)):
+        if simplified_child in (LAMBDA_NODE, NULL_NODE):
             return LAMBDA_NODE
         if rm_stars:
             return simplified_child
         node.child = simplified_child
         if isinstance(node.child, Union_Node):
-            if isinstance(node.child.left, Lambda_Node):
-                node.child = node.child.right
-            elif isinstance(node.child.right, Lambda_Node):
-                node.child = node.child.left
+            if node.child.left == LAMBDA_NODE:
+                return simplify(Star_Node(node.child.right))
+            elif node.child.right == LAMBDA_NODE:
+                return simplify(Star_Node(node.child.left))
         return node
     
     # binary op nodes
@@ -196,24 +191,25 @@ def simplify(node, rm_stars=False):
         node.left = simplify(node.left, rm_stars)
         node.right = simplify(node.right, rm_stars)
 
-        # remove null nodes in unions
+        # remove null nodes and double lambdas in unions
         if isinstance(node, Union_Node):
-            if isinstance(node.right, Null_Node):
+            if node.right == NULL_NODE:
                 return node.left
-            if isinstance(node.left, Null_Node):
+            if node.left== NULL_NODE:
                 return node.right
+            if node.left == LAMBDA_NODE and node.right == LAMBDA_NODE:
+                return LAMBDA_NODE
         
         # simplify cat nodes with lambdas or nulls
         elif isinstance(node, Cat_Node):
             # remove concatenated lambda nodes
-            if isinstance(node.left, Lambda_Node):
+            if node.left == LAMBDA_NODE:
                 return node.right
-            if isinstance(node.right, Lambda_Node):
+            if node.right == LAMBDA_NODE:
                 return node.left
 
             # concatenation with null node yields a null node
-            if (isinstance(node.left, Null_Node) or
-                isinstance(node.right, Null_Node)):
+            if node.right == NULL_NODE or node.left == NULL_NODE:
                 return NULL_NODE
     return node
 
@@ -309,11 +305,4 @@ def parse(regex, simple=True):
     return tree
 
 if __name__ == "__main__":
-    # print(parse("((a|b)(c|d*|e))*"))
-    # print(parse("((a|b)(c|d*|e))*").regex())
     print(parse("ab*|a(b|a)*b"))
-    # print(parse("a*"))
-    # print(parse("a|~"))
-    # print(parse("ab*c|^|cd*e"))
-    # print(parse("(^)*"))
-    # print(parse("a~"))
