@@ -166,39 +166,44 @@ class Stack():
     def __repr__(self):
         return repr(self.stack)
 
-def simplify(node, rm_stars=False):
+def simplify(node, desc_of_star=False):
     """Remove redundant nodes from regex parse tree"""
 
     # simplify star node
     if isinstance(node, Star_Node):
         # remove redunant star nodes from child of star node
-        simplified_child = simplify(node.child, rm_stars=True)
+        simplified_child = simplify(node.child, desc_of_star=True)
         if simplified_child in (LAMBDA_NODE, NULL_NODE):
             return LAMBDA_NODE
-        if rm_stars:
+        if desc_of_star:
             return simplified_child
         node.child = simplified_child
-        if isinstance(node.child, Union_Node):
-            if node.child.left == LAMBDA_NODE:
-                return simplify(Star_Node(node.child.right))
-            elif node.child.right == LAMBDA_NODE:
-                return simplify(Star_Node(node.child.left))
         return node
     
     # binary op nodes
     if isinstance(node, Bin_Op_Node):
-        rm_stars = False if isinstance(node, Cat_Node) else rm_stars
-        node.left = simplify(node.left, rm_stars)
-        node.right = simplify(node.right, rm_stars)
+        desc_of_star = False if isinstance(node, Cat_Node) else desc_of_star
+        node.left = simplify(node.left, desc_of_star)
+        node.right = simplify(node.right, desc_of_star)
 
-        # remove null nodes and double lambdas in unions
+        #  simplify unions
         if isinstance(node, Union_Node):
+            # remove null nodes
             if node.right == NULL_NODE:
                 return node.left
             if node.left== NULL_NODE:
                 return node.right
-            if node.left == LAMBDA_NODE and node.right == LAMBDA_NODE:
-                return LAMBDA_NODE
+            
+            # remove null nodes and duplicates
+            if node.left == node.right:
+                return node.left
+            
+            # remove lambda nodes in descendent of star node
+            if desc_of_star:
+                if node.left == LAMBDA_NODE:
+                    return node.right
+                if node.right == LAMBDA_NODE:
+                    return node.left
         
         # simplify cat nodes with lambdas or nulls
         elif isinstance(node, Cat_Node):
@@ -305,4 +310,5 @@ def parse(regex, simple=True):
     return tree
 
 if __name__ == "__main__":
-    print(parse("ab*|a(b|a)*b"))
+    print(parse("((^|a)|(b|(c|^)(^|d)))***"))
+    # print(parse("ab*|a(b|a)*b"))

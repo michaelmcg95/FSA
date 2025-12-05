@@ -8,7 +8,7 @@ from fsa import *
 
 class Test_Regex(unittest.TestCase):
     def test_regex_parser(self):
-        print("Testingregex parser")
+        print("Testing regex parser")
         # test valid regexes
         with open("testing/wb_cases/regex_valid") as case_file:
             lines = case_file.readlines()
@@ -25,7 +25,7 @@ class Test_Regex(unittest.TestCase):
             self.assertRaises(SyntaxError, lambda : parse(line.strip()))
 
     def test_nfa_regex(self):
-        print("Testingconversion between regex and nfa ")
+        print("Testing conversion between regex and nfa ")
         # test conversion between regex and nfa
         cases = load_regex_cases("testing/wb_cases/nfa_from_regex")
         for case in cases:
@@ -42,7 +42,7 @@ class Test_Regex(unittest.TestCase):
                 self.assertFalse(test_nfa2.test(s))
 
     def test_nfa_test(self):
-        print("Testingnfa string acceptance")
+        print("Testing nfa string acceptance")
         # test nfa string acceptance
         case = make_FSA_case("testing/wb_cases/nfa_test")
         test_nfa = NFA(jflap=f"{case.path}.jff")
@@ -57,7 +57,7 @@ class Test_Regex(unittest.TestCase):
             self.assertFalse(test_nfa.test_backtrack(test_string), msg + " backtrack")
         
     def test_dfa(self):
-        print("Testingdfa string acceptance")
+        print("Testing dfa string acceptance")
         # test dfa string acceptance
         case = make_FSA_case("testing/wb_cases/dfa_test")
         test_dfa = DFA(jflap=case.path + ".jff")
@@ -70,7 +70,7 @@ class Test_Regex(unittest.TestCase):
             self.assertFalse(test_dfa.test(test_string), msg)
 
     def test_nfa_to_dfa(self):
-        print("Testingnfa to dfa conversion")
+        print("Testing nfa to dfa conversion")
         # test nfa to dfa conversion
         case = make_FSA_case("testing/wb_cases/nfa_to_dfa")
         test_dfa = DFA(nfa=NFA(jflap=case.path + ".jff"))
@@ -83,7 +83,7 @@ class Test_Regex(unittest.TestCase):
             self.assertFalse(test_dfa.test(test_string), msg)
 
     def test_reduce_dfa(self):
-        print("Testingdfa state reduction")
+        print("Testing dfa state reduction")
         # test dfa state reduction method
         case = make_FSA_case("testing/wb_cases/reduce_dfa")
         test_dfa = DFA(jflap=case.path + ".jff").reduce()
@@ -96,7 +96,7 @@ class Test_Regex(unittest.TestCase):
             self.assertFalse(test_dfa.test(test_string), msg)
 
     def test_is_dfa(self):
-        print("Testingdfa identification")
+        print("Testing dfa identification")
         tg = Transition_Graph(jflap="testing/wb_cases/is_dfa_yes.jff")
         self.assertTrue(tg.is_dfa())
         tg = Transition_Graph(jflap="testing/wb_cases/is_dfa_no_mult.jff")
